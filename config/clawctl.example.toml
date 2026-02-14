@@ -1,0 +1,58 @@
+# clawctl.toml — OpenClaw Deployment Configuration
+#
+# Copy this file to ./clawctl.toml or ~/.config/clawctl/clawctl.toml
+# and edit it for your deployment.
+
+[clawctl]
+# Root directory for all user data, secrets, and backups on the host
+data_root = "/opt/openclaw"
+
+# OpenClaw npm package version (pinned)
+openclaw_version = "latest"
+
+# Docker image name (tagged as <image_name>:<openclaw_version>)
+image_name = "openclaw-instance"
+
+# Log level for clawctl (debug, info, warning, error)
+log_level = "info"
+
+[clawctl.backup]
+# Enable periodic git-based backup of user memory/workspace files
+enabled = true
+
+# Backup interval in minutes (5–60)
+interval_minutes = 15
+
+# File patterns to include in backup (relative to user's openclaw dir)
+include_patterns = [
+    "workspace/**/*.md",
+    "workspace/**/*.json",
+    "openclaw.json",
+]
+
+[clawctl.defaults]
+# Default AI model for new users
+model = "anthropic/claude-opus-4-6"
+
+# --- Users ---
+# Add one [[users]] block per team member.
+# Secret values are stored in separate files under <data_root>/secrets/<name>/
+# The secret names below refer to filenames, not the actual values.
+
+[[users]]
+name = "alice"
+
+[users.secrets]
+anthropic_api_key = "anthropic_api_key"
+
+[users.agent]
+model = "anthropic/claude-opus-4-6"
+
+[users.channels.slack]
+enabled = true
+bot_token_secret = "slack_bot_token"
+app_token_secret = "slack_app_token"
+
+[users.channels.discord]
+enabled = false
+# token_secret = "discord_token"
