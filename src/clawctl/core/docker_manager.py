@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 from typing import Iterator
@@ -19,6 +20,34 @@ NETWORK_PREFIX = "openclaw-net"
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 _DOCKER_DIR = _PROJECT_ROOT / "docker"
 
+# Well-known Docker socket paths (checked in order)
+_DOCKER_SOCKET_CANDIDATES = [
+    Path.home() / ".colima" / "default" / "docker.sock",
+    Path.home() / ".docker" / "run" / "docker.sock",
+    Path("/var/run/docker.sock"),
+]
+
+
+def _discover_docker_host() -> str | None:
+    """Return a DOCKER_HOST URI if the default socket isn't available.
+
+    Checks DOCKER_HOST env var first, then probes well-known socket paths.
+    Returns None if the standard /var/run/docker.sock exists (let the SDK
+    use its default).
+    """
+    if os.environ.get("DOCKER_HOST"):
+        return os.environ["DOCKER_HOST"]
+
+    # If the standard socket exists, no override needed
+    if Path("/var/run/docker.sock").exists():
+        return None
+
+    for candidate in _DOCKER_SOCKET_CANDIDATES:
+        if candidate.exists():
+            return f"unix://{candidate}"
+
+    return None
+
 
 def _container_name(username: str) -> str:
     return f"{CONTAINER_PREFIX}-{username}"
@@ -34,7 +63,11 @@ class DockerManager:
     def __init__(self, config: Config) -> None:
         self.config = config
         self.paths = Paths(config.clawctl.data_root)
-        self.client = docker.from_env()
+        self._docker_host = _discover_docker_host()
+        if self._docker_host:
+            self.client = docker.DockerClient(base_url=self._docker_host)
+        else:
+            self.client = docker.from_env()
 
     @property
     def image_tag(self) -> str:
@@ -56,7 +89,10 @@ class DockerManager:
             f"OPENCLAW_VERSION={self.config.clawctl.openclaw_version}",
             str(_DOCKER_DIR),
         ]
-        subprocess.run(cmd, check=True)
+        env = None
+        if self._docker_host:
+            env = {**os.environ, "DOCKER_HOST": self._docker_host}
+        subprocess.run(cmd, check=True, env=env)
 
     def image_exists(self) -> bool:
         """Check if the configured image is already built."""

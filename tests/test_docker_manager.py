@@ -26,7 +26,10 @@ class TestNaming:
 class TestDockerManager:
     @pytest.fixture
     def mock_client(self):
-        with patch("clawctl.core.docker_manager.docker.from_env") as mock_from_env:
+        with (
+            patch("clawctl.core.docker_manager._discover_docker_host", return_value=None),
+            patch("clawctl.core.docker_manager.docker.from_env") as mock_from_env,
+        ):
             client = MagicMock()
             mock_from_env.return_value = client
             yield client
