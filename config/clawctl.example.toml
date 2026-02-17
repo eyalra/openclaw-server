@@ -34,7 +34,7 @@ include_patterns = [
 
 [clawctl.defaults]
 # Default AI model for new users (OpenRouter free model)
-model = "openrouter/google/gemini-2.0-flash-exp:free"
+model = "openrouter/z-ai/glm-4.5-air:free"
 
 # --- Users ---
 # Add one [[users]] block per team member.
@@ -54,7 +54,7 @@ name = "alice"
 openrouter_api_key = "openrouter_api_key"
 
 [users.agent]
-model = "openrouter/google/gemini-2.0-flash-exp:free"
+model = "openrouter/z-ai/glm-4.5-air:free"
 
 [users.channels.slack]
 enabled = false

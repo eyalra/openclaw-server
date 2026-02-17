@@ -44,7 +44,7 @@ def sample_user() -> UserConfig:
                 token_secret="discord_token",
             ),
         ),
-        agent=UserAgentConfig(model="openrouter/google/gemini-2.0-flash-exp:free"),
+        agent=UserAgentConfig(model="openrouter/z-ai/glm-4.5-air:free"),
         secrets=UserSecretsConfig(openrouter_api_key="openrouter_api_key"),
     )
 

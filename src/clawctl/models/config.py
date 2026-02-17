@@ -25,7 +25,7 @@ class ChannelsConfig(BaseModel):
 
 
 class UserAgentConfig(BaseModel):
-    model: str = "openrouter/google/gemini-2.0-flash-exp:free"
+    model: str = "openrouter/z-ai/glm-4.5-air:free"
 
 
 class UserSecretsConfig(BaseModel):
@@ -72,7 +72,7 @@ class BackupConfig(BaseModel):
 
 
 class DefaultsConfig(BaseModel):
-    model: str = "openrouter/google/gemini-2.0-flash-exp:free"
+    model: str = "openrouter/z-ai/glm-4.5-air:free"
 
 
 class ClawctlSettings(BaseModel):

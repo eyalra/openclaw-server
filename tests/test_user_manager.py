@@ -97,7 +97,7 @@ class TestOpenClawConfig:
         config = generate_openclaw_config(sample_user, DefaultsConfig())
         assert config["gateway"]["port"] == 18789
         assert config["gateway"]["bind"] == "lan"
-        assert config["agents"]["defaults"]["model"]["primary"] == "openrouter/google/gemini-2.0-flash-exp:free"
+        assert config["agents"]["defaults"]["model"]["primary"] == "openrouter/z-ai/glm-4.5-air:free"
 
     def test_slack_channel_included(self, sample_user: UserConfig):
         config = generate_openclaw_config(sample_user, DefaultsConfig())
