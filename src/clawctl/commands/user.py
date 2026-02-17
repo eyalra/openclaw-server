@@ -13,7 +13,7 @@ from clawctl.core.config import load_config_or_exit
 from clawctl.core.docker_manager import DockerManager
 from clawctl.core.secrets import SecretsManager
 from clawctl.core.paths import Paths
-from clawctl.core.user_manager import UserManager
+from clawctl.core.user_manager import GATEWAY_TOKEN_SECRET_NAME, UserManager
 
 console = Console()
 
@@ -68,9 +68,13 @@ def user_add(
 
     docker = DockerManager(cfg)
     port = docker.get_container_port(name)
+    token = secrets_mgr.read_secret(name, GATEWAY_TOKEN_SECRET_NAME)
     console.print(f"[green]User '{name}' provisioned successfully.[/green]")
     if port:
-        console.print(f"  Gateway available at http://localhost:{port}")
+        url = f"http://localhost:{port}"
+        if token:
+            url += f"?token={token}"
+        console.print(f"  Dashboard: [link={url}]{url}[/link]")
 
 
 def user_remove(
@@ -110,18 +114,19 @@ def user_list(
     """List all configured users and their container status."""
     cfg = load_config_or_exit(config)
     docker = DockerManager(cfg)
+    secrets_mgr = SecretsManager(Paths(cfg.clawctl.data_root))
     statuses = docker.get_all_statuses()
 
     table = Table(title="Users")
     table.add_column("Name", style="bold")
     table.add_column("Status")
-    table.add_column("Port")
     table.add_column("Channels")
+    table.add_column("URL")
 
     for user in cfg.users:
         info = statuses.get(user.name, {"status": "unknown", "port": "-"})
-        status = info["status"]
-        style = "green" if status == "running" else "red" if status == "exited" else "dim"
+        st = info["status"]
+        style = "green" if st == "running" else "red" if st == "exited" else "dim"
 
         channels = []
         if user.channels.slack.enabled:
@@ -129,11 +134,18 @@ def user_list(
         if user.channels.discord.enabled:
             channels.append("discord")
 
+        url = "-"
+        if st == "running" and info["port"] != "-":
+            token = secrets_mgr.read_secret(user.name, GATEWAY_TOKEN_SECRET_NAME)
+            url = f"http://localhost:{info['port']}"
+            if token:
+                url += f"?token={token}"
+
         table.add_row(
             user.name,
-            f"[{style}]{status}[/{style}]",
-            info["port"],
+            f"[{style}]{st}[/{style}]",
             ", ".join(channels) or "-",
+            url,
         )
 
     console.print(table)
