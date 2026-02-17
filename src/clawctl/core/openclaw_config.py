@@ -28,6 +28,7 @@ def generate_openclaw_config(user: UserConfig, defaults: DefaultsConfig) -> dict
             "mode": "local",
             "port": 18789,
             "bind": "lan",  # 0.0.0.0 inside container for Docker networking
+            "auth": {"mode": "token"},  # token-only auth — avoids Docker NAT pairing issues
         },
         "channels": {},
     }
