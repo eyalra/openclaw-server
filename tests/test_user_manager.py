@@ -86,7 +86,7 @@ class TestSecretsManager:
         mgr = SecretsManager(paths)
         required = mgr.get_required_secrets(sample_user)
         names = [name for name, _ in required]
-        assert "anthropic_api_key" in names
+        assert "openrouter_api_key" in names
         assert "slack_bot_token" in names
         assert "slack_app_token" in names
         assert "discord_token" in names
@@ -97,7 +97,7 @@ class TestOpenClawConfig:
         config = generate_openclaw_config(sample_user, DefaultsConfig())
         assert config["gateway"]["port"] == 18789
         assert config["gateway"]["bind"] == "lan"
-        assert config["agents"]["defaults"]["model"]["primary"] == "anthropic/claude-opus-4-6"
+        assert config["agents"]["defaults"]["model"]["primary"] == "openrouter/google/gemini-2.0-flash-exp:free"
 
     def test_slack_channel_included(self, sample_user: UserConfig):
         config = generate_openclaw_config(sample_user, DefaultsConfig())
@@ -112,7 +112,7 @@ class TestOpenClawConfig:
     def test_disabled_channels_excluded(self):
         user = UserConfig(
             name="bob",
-            secrets={"anthropic_api_key": "key"},
+            secrets={"openrouter_api_key": "key"},
         )
         config = generate_openclaw_config(user, DefaultsConfig())
         assert "slack" not in config["channels"]

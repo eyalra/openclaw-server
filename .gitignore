@@ -35,6 +35,8 @@ htmlcov/
 
 # uv
 uv.lock
+Pipfile
+Pipfile.lock
 
 # clawctl runtime data (build/ contains user data, secrets, backups)
 # build/ is already covered above

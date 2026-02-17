@@ -14,14 +14,14 @@ class TestConfigModels:
     def test_valid_username(self):
         user = UserConfig(
             name="alice",
-            secrets={"anthropic_api_key": "key"},
+            secrets={"openrouter_api_key": "key"},
         )
         assert user.name == "alice"
 
     def test_username_with_hyphens(self):
         user = UserConfig(
             name="alice-dev",
-            secrets={"anthropic_api_key": "key"},
+            secrets={"openrouter_api_key": "key"},
         )
         assert user.name == "alice-dev"
 
@@ -29,28 +29,28 @@ class TestConfigModels:
         with pytest.raises(ValueError, match="lowercase"):
             UserConfig(
                 name="Alice",
-                secrets={"anthropic_api_key": "key"},
+                secrets={"openrouter_api_key": "key"},
             )
 
     def test_invalid_username_spaces(self):
         with pytest.raises(ValueError, match="lowercase"):
             UserConfig(
                 name="alice smith",
-                secrets={"anthropic_api_key": "key"},
+                secrets={"openrouter_api_key": "key"},
             )
 
     def test_invalid_username_too_long(self):
         with pytest.raises(ValueError, match="lowercase"):
             UserConfig(
                 name="a" * 33,
-                secrets={"anthropic_api_key": "key"},
+                secrets={"openrouter_api_key": "key"},
             )
 
     def test_invalid_username_starts_with_hyphen(self):
         with pytest.raises(ValueError, match="lowercase"):
             UserConfig(
                 name="-alice",
-                secrets={"anthropic_api_key": "key"},
+                secrets={"openrouter_api_key": "key"},
             )
 
     def test_config_get_user(self, sample_config: Config):
@@ -110,7 +110,7 @@ openclaw_version = "latest"
 name = "testuser"
 
 [users.secrets]
-anthropic_api_key = "anthropic_api_key"
+openrouter_api_key = "openrouter_api_key"
 """)
         cfg = load_config(config_file)
         assert cfg.clawctl.data_root == tmp_path / "build"
@@ -129,7 +129,7 @@ openclaw_version = "latest"
 name = "testuser"
 
 [users.secrets]
-anthropic_api_key = "anthropic_api_key"
+openrouter_api_key = "openrouter_api_key"
 """)
         cfg = load_config(config_file)
         assert cfg.clawctl.data_root == abs_path

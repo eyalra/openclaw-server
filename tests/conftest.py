@@ -44,8 +44,8 @@ def sample_user() -> UserConfig:
                 token_secret="discord_token",
             ),
         ),
-        agent=UserAgentConfig(model="anthropic/claude-opus-4-6"),
-        secrets=UserSecretsConfig(anthropic_api_key="anthropic_api_key"),
+        agent=UserAgentConfig(model="openrouter/google/gemini-2.0-flash-exp:free"),
+        secrets=UserSecretsConfig(openrouter_api_key="openrouter_api_key"),
     )
 
 
@@ -84,7 +84,7 @@ interval_minutes = 15
 name = "testuser"
 
 [users.secrets]
-anthropic_api_key = "anthropic_api_key"
+openrouter_api_key = "openrouter_api_key"
 
 [users.channels.slack]
 enabled = true

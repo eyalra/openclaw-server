@@ -68,12 +68,18 @@ class SecretsManager:
     def get_required_secrets(self, user_config) -> list[tuple[str, str]]:
         """Get list of (secret_name, description) required for a user config.
 
-        Examines enabled channels and base secrets to determine what's needed.
+        Examines the user's secrets mapping and enabled channels to determine
+        what's needed.  Each entry in user_config.secrets (extra fields) maps
+        a logical name to a secret filename.
         """
         required: list[tuple[str, str]] = []
 
-        # Always need the Anthropic API key
-        required.append((user_config.secrets.anthropic_api_key, "Anthropic API key"))
+        # Collect all explicitly declared secrets from the [users.secrets] block.
+        # Pydantic's extra="allow" stores them in model_extra.
+        extras = user_config.secrets.model_extra or {}
+        for logical_name, secret_filename in extras.items():
+            description = logical_name.replace("_", " ").title()
+            required.append((secret_filename, description))
 
         # Slack secrets
         if user_config.channels.slack.enabled:

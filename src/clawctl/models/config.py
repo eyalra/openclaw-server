@@ -25,11 +25,23 @@ class ChannelsConfig(BaseModel):
 
 
 class UserAgentConfig(BaseModel):
-    model: str = "anthropic/claude-opus-4-6"
+    model: str = "openrouter/google/gemini-2.0-flash-exp:free"
 
 
 class UserSecretsConfig(BaseModel):
-    anthropic_api_key: str
+    """Flexible secret mapping: logical name → secret filename.
+
+    Each key becomes the env var name (uppercased) inside the container.
+    Example: openrouter_api_key = "openrouter_api_key" results in
+    OPENROUTER_API_KEY being set from /run/secrets/openrouter_api_key.
+    """
+
+    model_config = {"extra": "allow"}
+
+    # No required fields — what you need depends on your provider.
+    # Common examples:
+    #   openrouter_api_key = "openrouter_api_key"
+    #   anthropic_api_key = "anthropic_api_key"
 
 
 class UserConfig(BaseModel):
@@ -60,7 +72,7 @@ class BackupConfig(BaseModel):
 
 
 class DefaultsConfig(BaseModel):
-    model: str = "anthropic/claude-opus-4-6"
+    model: str = "openrouter/google/gemini-2.0-flash-exp:free"
 
 
 class ClawctlSettings(BaseModel):

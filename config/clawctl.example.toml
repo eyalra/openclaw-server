@@ -33,27 +33,33 @@ include_patterns = [
 ]
 
 [clawctl.defaults]
-# Default AI model for new users
-model = "anthropic/claude-opus-4-6"
+# Default AI model for new users (OpenRouter free model)
+model = "openrouter/google/gemini-2.0-flash-exp:free"
 
 # --- Users ---
 # Add one [[users]] block per team member.
 # Secret values are stored in separate files under build/secrets/<name>/
 # The secret names below refer to filenames, not the actual values.
+#
+# Secrets are flexible — declare whichever API keys your provider needs.
+# Each key becomes an env var inside the container (uppercased).
+# Examples:
+#   openrouter_api_key = "openrouter_api_key"  → OPENROUTER_API_KEY
+#   anthropic_api_key  = "anthropic_api_key"   → ANTHROPIC_API_KEY
 
 [[users]]
 name = "alice"
 
 [users.secrets]
-anthropic_api_key = "anthropic_api_key"
+openrouter_api_key = "openrouter_api_key"
 
 [users.agent]
-model = "anthropic/claude-opus-4-6"
+model = "openrouter/google/gemini-2.0-flash-exp:free"
 
 [users.channels.slack]
-enabled = true
-bot_token_secret = "slack_bot_token"
-app_token_secret = "slack_app_token"
+enabled = false
+# bot_token_secret = "slack_bot_token"
+# app_token_secret = "slack_app_token"
 
 [users.channels.discord]
 enabled = false
