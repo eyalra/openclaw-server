@@ -15,11 +15,17 @@ def generate_openclaw_config(user: UserConfig, defaults: DefaultsConfig) -> dict
     Channel tokens come from environment variables (injected by entrypoint.sh),
     not from this config file.
     """
+    model = user.agent.model or defaults.model
     config: dict = {
-        "agent": {
-            "model": user.agent.model or defaults.model,
+        "agents": {
+            "defaults": {
+                "model": {
+                    "primary": model,
+                },
+            },
         },
         "gateway": {
+            "mode": "local",
             "port": 18789,
             "bind": "lan",  # 0.0.0.0 inside container for Docker networking
         },

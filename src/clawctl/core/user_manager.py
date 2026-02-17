@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import secrets
 import shutil
 
 from clawctl.core.docker_manager import DockerManager
@@ -9,6 +10,8 @@ from clawctl.core.openclaw_config import write_openclaw_config
 from clawctl.core.paths import Paths
 from clawctl.core.secrets import SecretsManager
 from clawctl.models.config import Config, UserConfig
+
+GATEWAY_TOKEN_SECRET_NAME = "openclaw_gateway_token"
 
 
 class UserManager:
@@ -36,14 +39,19 @@ class UserManager:
         for name, value in secret_values.items():
             self.secrets.write_secret(user.name, name, value)
 
-        # 3. Generate openclaw.json
+        # 3. Auto-generate a gateway token if not already present
+        if not self.secrets.secret_exists(user.name, GATEWAY_TOKEN_SECRET_NAME):
+            token = secrets.token_urlsafe(32)
+            self.secrets.write_secret(user.name, GATEWAY_TOKEN_SECRET_NAME, token)
+
+        # 4. Generate openclaw.json
         write_openclaw_config(
             user,
             self.config.clawctl.defaults,
             self.paths.user_openclaw_config(user.name),
         )
 
-        # 4. Create and start container
+        # 5. Create and start container
         if not self.docker.image_exists():
             self.docker.build_image()
         self.docker.create_container(user)

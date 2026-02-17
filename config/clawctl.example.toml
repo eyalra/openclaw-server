@@ -4,8 +4,9 @@
 # and edit it for your deployment.
 
 [clawctl]
-# Root directory for all user data, secrets, and backups on the host
-data_root = "/opt/openclaw"
+# Root directory for all user data, secrets, and backups on the host.
+# NOTE: If using Colima, this must be under $HOME (Colima only mounts $HOME by default).
+data_root = "~/.clawctl"
 
 # OpenClaw npm package version (pinned)
 openclaw_version = "latest"
