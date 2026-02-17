@@ -58,6 +58,7 @@ from clawctl.commands.logs import logs  # noqa: E402
 from clawctl.commands.backup import backup_run, schedule_start, schedule_stop, schedule_status  # noqa: E402
 from clawctl.commands.config_cmd import validate  # noqa: E402
 from clawctl.commands.update import update  # noqa: E402
+from clawctl.commands.clean import clean  # noqa: E402
 
 # Register top-level commands
 app.command()(init)
@@ -69,6 +70,7 @@ app.command(name="stop-all")(stop_all)
 app.command()(status)
 app.command()(logs)
 app.command()(update)
+app.command()(clean)
 
 # Register sub-commands
 user_app.command(name="add")(user_add)
