@@ -9,7 +9,7 @@ import typer
 from rich.console import Console
 
 from clawctl.core.backup_manager import BackupManager
-from clawctl.core.config import load_config_or_exit
+from clawctl.core.config import find_config_path, load_config_or_exit
 
 console = Console()
 
@@ -41,6 +41,7 @@ def schedule_start(
     ] = None,
 ) -> None:
     """Start the periodic backup daemon."""
+    config_path = find_config_path(config)
     cfg = load_config_or_exit(config)
     manager = BackupManager(cfg)
 
@@ -48,7 +49,7 @@ def schedule_start(
         console.print("[yellow]Backup daemon is already running.[/yellow]")
         raise typer.Exit()
 
-    pid = manager.start_daemon()
+    pid = manager.start_daemon(config_path)
     interval = cfg.clawctl.backup.interval_minutes
     console.print(
         f"[green]Backup daemon started[/green] (PID {pid}, every {interval} min)"

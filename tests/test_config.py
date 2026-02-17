@@ -97,3 +97,39 @@ class TestConfigLoading:
                 data_root="/tmp/test",
                 backup={"interval_minutes": 3},  # below minimum of 5
             )
+
+    def test_relative_data_root_resolved(self, tmp_path: Path):
+        """data_root = 'build' resolves relative to the config file's directory."""
+        config_file = tmp_path / "clawctl.toml"
+        config_file.write_text("""\
+[clawctl]
+data_root = "build"
+openclaw_version = "latest"
+
+[[users]]
+name = "testuser"
+
+[users.secrets]
+anthropic_api_key = "anthropic_api_key"
+""")
+        cfg = load_config(config_file)
+        assert cfg.clawctl.data_root == tmp_path / "build"
+        assert cfg.clawctl.data_root.is_absolute()
+
+    def test_absolute_data_root_preserved(self, tmp_path: Path):
+        """Absolute data_root stays as-is."""
+        abs_path = tmp_path / "my-data"
+        config_file = tmp_path / "clawctl.toml"
+        config_file.write_text(f"""\
+[clawctl]
+data_root = "{abs_path}"
+openclaw_version = "latest"
+
+[[users]]
+name = "testuser"
+
+[users.secrets]
+anthropic_api_key = "anthropic_api_key"
+""")
+        cfg = load_config(config_file)
+        assert cfg.clawctl.data_root == abs_path

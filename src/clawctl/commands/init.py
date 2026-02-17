@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
-from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -13,39 +12,39 @@ from clawctl.core.paths import Paths
 
 console = Console()
 
+# Resolve the project-level config/ directory from this source file
+_PACKAGE_ROOT = Path(__file__).resolve().parents[2]  # src/clawctl/commands -> src/clawctl -> src
+_PROJECT_ROOT = _PACKAGE_ROOT.parent  # src -> project root
 
-def init(
-    data_root: Annotated[
-        Path,
-        typer.Option("--data-root", "-d", help="Root directory for all user data"),
-    ] = Path("/opt/openclaw"),
-) -> None:
-    """Initialize a new clawctl deployment.
 
-    Creates the data directory structure and a template config file.
+def _find_example_config() -> Path | None:
+    """Find the example config template relative to the project."""
+    candidates = [
+        _PROJECT_ROOT / "config" / "clawctl.example.toml",
+        _PACKAGE_ROOT / "config" / "clawctl.example.toml",
+    ]
+    for path in candidates:
+        if path.is_file():
+            return path
+    return None
+
+
+def init() -> None:
+    """Initialize a new clawctl deployment in the current directory.
+
+    Creates a build/ directory for runtime data and a template config file.
     """
-    paths = Paths(data_root)
+    build_dir = Path("build").resolve()
+    paths = Paths(build_dir)
     paths.ensure_base_dirs()
 
     # Copy example config to working directory if none exists
     config_dest = Path("clawctl.toml")
     if not config_dest.exists():
-        example = Path(__file__).resolve().parents[2] / "config" / "clawctl.example.toml"
-
-        # Fall back to package-adjacent path
-        if not example.exists():
-            example = Path(__file__).resolve().parents[3] / "config" / "clawctl.example.toml"
-
-        if example.exists():
+        example = _find_example_config()
+        if example is not None:
             shutil.copy2(example, config_dest)
-            # Update data_root in the generated config
-            text = config_dest.read_text()
-            text = text.replace(
-                'data_root = "/opt/openclaw"',
-                f'data_root = "{data_root}"',
-            )
-            config_dest.write_text(text)
-            console.print(f"Created [bold]clawctl.toml[/bold] with data_root={data_root}")
+            console.print("Created [bold]clawctl.toml[/bold]")
         else:
             console.print(
                 "[yellow]Warning:[/yellow] Could not find example config template. "
@@ -54,7 +53,7 @@ def init(
     else:
         console.print("[dim]clawctl.toml already exists, skipping.[/dim]")
 
-    console.print(f"Data directory initialized at [bold]{data_root}[/bold]")
+    console.print(f"Build directory initialized at [bold]{build_dir}[/bold]")
     console.print()
     console.print("Next steps:")
     console.print("  1. Edit [bold]clawctl.toml[/bold] to add users and configure channels")

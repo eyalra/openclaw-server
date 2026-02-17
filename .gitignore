@@ -36,5 +36,7 @@ htmlcov/
 # uv
 uv.lock
 
-# clawctl data (never commit real configs with secrets)
+# clawctl runtime data (build/ contains user data, secrets, backups)
+# build/ is already covered above
+clawctl.toml
 *.secrets

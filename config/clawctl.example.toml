@@ -1,12 +1,13 @@
 # clawctl.toml — OpenClaw Deployment Configuration
 #
-# Copy this file to ./clawctl.toml or ~/.config/clawctl/clawctl.toml
-# and edit it for your deployment.
+# Place this file in the project root directory.
+# All paths are resolved relative to this file's location.
 
 [clawctl]
-# Root directory for all user data, secrets, and backups on the host.
-# NOTE: If using Colima, this must be under $HOME (Colima only mounts $HOME by default).
-data_root = "~/.clawctl"
+# Root directory for all runtime data (users, secrets, backups).
+# Relative to this config file's directory (i.e. the project root).
+# NOTE: If using Colima, the resolved path must be under $HOME.
+data_root = "build"
 
 # OpenClaw npm package version (pinned)
 openclaw_version = "latest"
@@ -37,7 +38,7 @@ model = "anthropic/claude-opus-4-6"
 
 # --- Users ---
 # Add one [[users]] block per team member.
-# Secret values are stored in separate files under <data_root>/secrets/<name>/
+# Secret values are stored in separate files under build/secrets/<name>/
 # The secret names below refer to filenames, not the actual values.
 
 [[users]]

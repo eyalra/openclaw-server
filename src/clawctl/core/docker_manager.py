@@ -15,6 +15,10 @@ from clawctl.models.config import Config, UserConfig
 CONTAINER_PREFIX = "openclaw"
 NETWORK_PREFIX = "openclaw-net"
 
+# Resolve the docker/ directory from the project root
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+_DOCKER_DIR = _PROJECT_ROOT / "docker"
+
 
 def _container_name(username: str) -> str:
     return f"{CONTAINER_PREFIX}-{username}"
@@ -43,7 +47,6 @@ class DockerManager:
 
         Uses subprocess for reliable streaming build output.
         """
-        dockerfile_dir = Path(__file__).resolve().parents[3] / "docker"
         cmd = [
             "docker",
             "build",
@@ -51,7 +54,7 @@ class DockerManager:
             self.image_tag,
             "--build-arg",
             f"OPENCLAW_VERSION={self.config.clawctl.openclaw_version}",
-            str(dockerfile_dir),
+            str(_DOCKER_DIR),
         ]
         subprocess.run(cmd, check=True)
 

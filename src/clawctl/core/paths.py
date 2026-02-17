@@ -19,7 +19,7 @@ class Paths:
     """
 
     def __init__(self, data_root: Path) -> None:
-        self.data_root = data_root.expanduser().resolve()
+        self.data_root = Path(data_root).resolve()
 
     # --- Top-level ---
 

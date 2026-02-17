@@ -166,8 +166,11 @@ class BackupManager:
 
         logger.info("Backup daemon stopped")
 
-    def start_daemon(self) -> int:
+    def start_daemon(self, config_path: Path) -> int:
         """Start the backup daemon as a background process.
+
+        Args:
+            config_path: Absolute path to the clawctl.toml config file.
 
         Returns the PID of the spawned process.
         """
@@ -179,13 +182,13 @@ class BackupManager:
             msg = "Backup daemon is already running"
             raise RuntimeError(msg)
 
-        # Spawn a detached process running this module
+        # Spawn a detached process running this module with the config path
         proc = subprocess.Popen(
             [
                 sys.executable,
                 "-m",
                 "clawctl.core.backup_manager",
-                str(self.paths.data_root),
+                str(config_path),
             ],
             start_new_session=True,
             stdout=subprocess.DEVNULL,
@@ -238,14 +241,9 @@ def _run_daemon_main() -> None:
         print("Usage: python -m clawctl.core.backup_manager <config_path>")
         sys.exit(1)
 
-    # The argument is the data_root, but we need the config file.
-    # The daemon is started by the CLI which knows the config path.
-    # We'll re-find it using the default search.
-    from clawctl.core.config import find_config_path
-
-    config_path = find_config_path()
-    if config_path is None:
-        print("Config file not found")
+    config_path = Path(sys.argv[1])
+    if not config_path.is_file():
+        print(f"Config file not found: {config_path}")
         sys.exit(1)
 
     config = load_config(config_path)

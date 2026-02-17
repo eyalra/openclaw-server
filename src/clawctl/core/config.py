@@ -10,9 +10,9 @@ from pydantic import ValidationError
 
 from clawctl.models.config import Config
 
+# Config is searched relative to the current directory (project root).
 DEFAULT_CONFIG_PATHS = [
     Path("clawctl.toml"),
-    Path.home() / ".config" / "clawctl" / "clawctl.toml",
 ]
 
 
@@ -20,18 +20,21 @@ def find_config_path(explicit_path: Path | None = None) -> Path | None:
     """Find the config file, checking explicit path, then defaults."""
     if explicit_path is not None:
         if explicit_path.is_file():
-            return explicit_path
+            return explicit_path.resolve()
         return None
 
     for path in DEFAULT_CONFIG_PATHS:
         if path.is_file():
-            return path
+            return path.resolve()
 
     return None
 
 
 def load_config(path: Path) -> Config:
     """Load and validate config from a TOML file.
+
+    The data_root is resolved relative to the config file's directory,
+    so that ``data_root = "build"`` points to ``<project>/build/``.
 
     Raises:
         FileNotFoundError: If the config file doesn't exist.
@@ -41,6 +44,7 @@ def load_config(path: Path) -> Config:
         msg = f"Config file not found: {path}"
         raise FileNotFoundError(msg)
 
+    config_dir = path.resolve().parent
     text = path.read_text()
 
     try:
@@ -50,10 +54,18 @@ def load_config(path: Path) -> Config:
         raise ValueError(msg) from e
 
     try:
-        return Config.model_validate(raw)
+        config = Config.model_validate(raw)
     except ValidationError as e:
         msg = f"Config validation failed:\n{e}"
         raise ValueError(msg) from e
+
+    # Resolve data_root relative to the config file's directory
+    if not config.clawctl.data_root.is_absolute():
+        config.clawctl.data_root = (config_dir / config.clawctl.data_root).resolve()
+    else:
+        config.clawctl.data_root = config.clawctl.data_root.expanduser().resolve()
+
+    return config
 
 
 def load_config_or_exit(path: Path | None = None) -> Config:
