@@ -44,11 +44,14 @@ class UserManager:
             token = secrets.token_urlsafe(32)
             self.secrets.write_secret(user.name, GATEWAY_TOKEN_SECRET_NAME, token)
 
-        # 4. Generate openclaw.json
+        gateway_token = self.secrets.read_secret(user.name, GATEWAY_TOKEN_SECRET_NAME)
+
+        # 4. Generate openclaw.json (includes gateway token for Docker NAT auth)
         write_openclaw_config(
             user,
             self.config.clawctl.defaults,
             self.paths.user_openclaw_config(user.name),
+            gateway_token=gateway_token,
         )
 
         # 5. Create and start container
