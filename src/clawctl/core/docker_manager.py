@@ -62,7 +62,7 @@ class DockerManager:
 
     def __init__(self, config: Config) -> None:
         self.config = config
-        self.paths = Paths(config.clawctl.data_root)
+        self.paths = Paths(config.clawctl.data_root, config.clawctl.build_root)
         self._docker_host = _discover_docker_host()
         if self._docker_host:
             self.client = docker.DockerClient(base_url=self._docker_host)

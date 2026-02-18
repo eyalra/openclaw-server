@@ -32,10 +32,12 @@ def _find_example_config() -> Path | None:
 def init() -> None:
     """Initialize a new clawctl deployment in the current directory.
 
-    Creates a build/ directory for runtime data and a template config file.
+    Creates build/ (infrastructure) and data/ (persistent user state)
+    directories, plus a template config file.
     """
     build_dir = Path("build").resolve()
-    paths = Paths(build_dir)
+    data_dir = Path("data").resolve()
+    paths = Paths(data_dir, build_dir)
     paths.ensure_base_dirs()
 
     # Copy example config to working directory if none exists
@@ -53,7 +55,8 @@ def init() -> None:
     else:
         console.print("[dim]clawctl.toml already exists, skipping.[/dim]")
 
-    console.print(f"Build directory initialized at [bold]{build_dir}[/bold]")
+    console.print(f"Build directory at [bold]{build_dir}[/bold] (infrastructure, disposable)")
+    console.print(f"Data directory at  [bold]{data_dir}[/bold] (user state, persistent)")
     console.print()
     console.print("Next steps:")
     console.print("  1. Edit [bold]clawctl.toml[/bold] to add users and configure channels")

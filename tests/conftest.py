@@ -29,6 +29,14 @@ def tmp_data_root(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
+def tmp_build_root(tmp_path: Path) -> Path:
+    """A temporary build root directory."""
+    root = tmp_path / "openclaw-build"
+    root.mkdir()
+    return root
+
+
+@pytest.fixture
 def sample_user() -> UserConfig:
     """A sample user configuration."""
     return UserConfig(
@@ -50,11 +58,12 @@ def sample_user() -> UserConfig:
 
 
 @pytest.fixture
-def sample_config(tmp_data_root: Path, sample_user: UserConfig) -> Config:
+def sample_config(tmp_data_root: Path, tmp_build_root: Path, sample_user: UserConfig) -> Config:
     """A sample full configuration."""
     return Config(
         clawctl=ClawctlSettings(
             data_root=tmp_data_root,
+            build_root=tmp_build_root,
             openclaw_version="latest",
             image_name="openclaw-instance",
             backup=BackupConfig(
@@ -68,11 +77,12 @@ def sample_config(tmp_data_root: Path, sample_user: UserConfig) -> Config:
 
 
 @pytest.fixture
-def sample_config_toml(tmp_data_root: Path) -> str:
+def sample_config_toml(tmp_data_root: Path, tmp_build_root: Path) -> str:
     """Sample config as TOML string."""
     return f"""\
 [clawctl]
 data_root = "{tmp_data_root}"
+build_root = "{tmp_build_root}"
 openclaw_version = "latest"
 image_name = "openclaw-instance"
 

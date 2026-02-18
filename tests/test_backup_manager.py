@@ -14,7 +14,7 @@ from clawctl.models.config import Config
 class TestBackupManager:
     @pytest.fixture
     def manager(self, sample_config: Config) -> BackupManager:
-        paths = Paths(sample_config.clawctl.data_root)
+        paths = Paths(sample_config.clawctl.data_root, sample_config.clawctl.build_root)
         paths.ensure_base_dirs()
         paths.ensure_user_dirs("testuser")
         return BackupManager(sample_config)

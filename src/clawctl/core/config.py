@@ -59,11 +59,29 @@ def load_config(path: Path) -> Config:
         msg = f"Config validation failed:\n{e}"
         raise ValueError(msg) from e
 
-    # Resolve data_root relative to the config file's directory
-    if not config.clawctl.data_root.is_absolute():
-        config.clawctl.data_root = (config_dir / config.clawctl.data_root).resolve()
-    else:
-        config.clawctl.data_root = config.clawctl.data_root.expanduser().resolve()
+    # Resolve data_root and build_root relative to the config file's directory
+    for attr in ("data_root", "build_root"):
+        value = getattr(config.clawctl, attr)
+        if not value.is_absolute():
+            setattr(config.clawctl, attr, (config_dir / value).resolve())
+        else:
+            setattr(config.clawctl, attr, value.expanduser().resolve())
+
+    # Resolve workspace_template paths (global default and per-user)
+    if config.clawctl.defaults.workspace_template is not None:
+        wt = config.clawctl.defaults.workspace_template
+        if not wt.is_absolute():
+            config.clawctl.defaults.workspace_template = (config_dir / wt).resolve()
+        else:
+            config.clawctl.defaults.workspace_template = wt.expanduser().resolve()
+
+    for user in config.users:
+        if user.workspace_template is not None:
+            wt = user.workspace_template
+            if not wt.is_absolute():
+                user.workspace_template = (config_dir / wt).resolve()
+            else:
+                user.workspace_template = wt.expanduser().resolve()
 
     return config
 

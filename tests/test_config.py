@@ -85,9 +85,9 @@ class TestConfigLoading:
         with pytest.raises(ValueError, match="Invalid TOML"):
             load_config(config_file)
 
-    def test_load_missing_required_field(self, tmp_path: Path):
+    def test_load_missing_clawctl_section(self, tmp_path: Path):
         config_file = tmp_path / "incomplete.toml"
-        config_file.write_text("[clawctl]\n# missing data_root\n")
+        config_file.write_text("# no [clawctl] section at all\n")
         with pytest.raises(ValueError, match="validation failed"):
             load_config(config_file)
 
@@ -98,12 +98,13 @@ class TestConfigLoading:
                 backup={"interval_minutes": 3},  # below minimum of 5
             )
 
-    def test_relative_data_root_resolved(self, tmp_path: Path):
-        """data_root = 'build' resolves relative to the config file's directory."""
+    def test_relative_roots_resolved(self, tmp_path: Path):
+        """Relative data_root and build_root resolve relative to the config file's directory."""
         config_file = tmp_path / "clawctl.toml"
         config_file.write_text("""\
 [clawctl]
-data_root = "build"
+data_root = "data"
+build_root = "build"
 openclaw_version = "latest"
 
 [[users]]
@@ -113,16 +114,20 @@ name = "testuser"
 openrouter_api_key = "openrouter_api_key"
 """)
         cfg = load_config(config_file)
-        assert cfg.clawctl.data_root == tmp_path / "build"
+        assert cfg.clawctl.data_root == tmp_path / "data"
         assert cfg.clawctl.data_root.is_absolute()
+        assert cfg.clawctl.build_root == tmp_path / "build"
+        assert cfg.clawctl.build_root.is_absolute()
 
-    def test_absolute_data_root_preserved(self, tmp_path: Path):
-        """Absolute data_root stays as-is."""
-        abs_path = tmp_path / "my-data"
+    def test_absolute_roots_preserved(self, tmp_path: Path):
+        """Absolute data_root and build_root stay as-is."""
+        abs_data = tmp_path / "my-data"
+        abs_build = tmp_path / "my-build"
         config_file = tmp_path / "clawctl.toml"
         config_file.write_text(f"""\
 [clawctl]
-data_root = "{abs_path}"
+data_root = "{abs_data}"
+build_root = "{abs_build}"
 openclaw_version = "latest"
 
 [[users]]
@@ -132,4 +137,149 @@ name = "testuser"
 openrouter_api_key = "openrouter_api_key"
 """)
         cfg = load_config(config_file)
-        assert cfg.clawctl.data_root == abs_path
+        assert cfg.clawctl.data_root == abs_data
+        assert cfg.clawctl.build_root == abs_build
+
+    def test_relative_workspace_template_resolved(self, tmp_path: Path):
+        """Relative workspace_template resolves relative to config file directory."""
+        config_file = tmp_path / "clawctl.toml"
+        config_file.write_text("""\
+[clawctl]
+
+[clawctl.defaults]
+workspace_template = "templates/default"
+
+[[users]]
+name = "testuser"
+workspace_template = "templates/custom"
+
+[users.secrets]
+openrouter_api_key = "openrouter_api_key"
+""")
+        cfg = load_config(config_file)
+        assert cfg.clawctl.defaults.workspace_template == tmp_path / "templates" / "default"
+        assert cfg.clawctl.defaults.workspace_template.is_absolute()
+        assert cfg.users[0].workspace_template == tmp_path / "templates" / "custom"
+        assert cfg.users[0].workspace_template.is_absolute()
+
+    def test_no_workspace_template_is_none(self, tmp_path: Path):
+        """When workspace_template is omitted, the field is None."""
+        config_file = tmp_path / "clawctl.toml"
+        config_file.write_text("""\
+[clawctl]
+
+[[users]]
+name = "testuser"
+
+[users.secrets]
+openrouter_api_key = "openrouter_api_key"
+""")
+        cfg = load_config(config_file)
+        assert cfg.clawctl.defaults.workspace_template is None
+        assert cfg.users[0].workspace_template is None
+
+    def test_default_skills_enabled(self, tmp_path: Path):
+        """Default skills (gog, gemini, coding_agent) are enabled by default."""
+        config_file = tmp_path / "clawctl.toml"
+        config_file.write_text("""\
+[clawctl]
+
+[[users]]
+name = "testuser"
+
+[users.secrets]
+openrouter_api_key = "openrouter_api_key"
+""")
+        cfg = load_config(config_file)
+        assert cfg.clawctl.defaults.skills.gog.enabled is True
+        assert cfg.clawctl.defaults.skills.gemini is True
+        assert cfg.clawctl.defaults.skills.coding_agent is True
+        # User inherits defaults
+        assert cfg.users[0].skills.gog.enabled is True
+        assert cfg.users[0].skills.gemini is True
+        assert cfg.users[0].skills.coding_agent is True
+
+    def test_user_skill_override(self, tmp_path: Path):
+        """User can override default skill settings."""
+        config_file = tmp_path / "clawctl.toml"
+        config_file.write_text("""\
+[clawctl]
+
+[clawctl.defaults.skills]
+gemini = true
+coding_agent = true
+
+[clawctl.defaults.skills.gog]
+enabled = true
+
+[[users]]
+name = "testuser"
+
+[users.skills]
+gemini = false
+
+[users.secrets]
+openrouter_api_key = "openrouter_api_key"
+""")
+        cfg = load_config(config_file)
+        assert cfg.users[0].skills.gog.enabled is True
+        assert cfg.users[0].skills.gemini is False
+        assert cfg.users[0].skills.coding_agent is True
+
+    def test_skills_config_in_defaults(self, tmp_path: Path):
+        """Skills can be configured globally in [clawctl.defaults.skills]."""
+        config_file = tmp_path / "clawctl.toml"
+        config_file.write_text("""\
+[clawctl]
+
+[clawctl.defaults.skills]
+gemini = true
+coding_agent = false
+
+[clawctl.defaults.skills.gog]
+enabled = false
+
+[[users]]
+name = "testuser"
+
+[users.secrets]
+openrouter_api_key = "openrouter_api_key"
+""")
+        cfg = load_config(config_file)
+        assert cfg.clawctl.defaults.skills.gog.enabled is False
+        assert cfg.clawctl.defaults.skills.gemini is True
+        assert cfg.clawctl.defaults.skills.coding_agent is False
+
+    def test_gog_email_loaded_from_toml(self, tmp_path: Path):
+        """Gog email is parsed from the user's skills.gog config."""
+        config_file = tmp_path / "clawctl.toml"
+        config_file.write_text("""\
+[clawctl]
+
+[[users]]
+name = "alice"
+
+[users.skills.gog]
+enabled = true
+email = "alice@example.com"
+
+[users.secrets]
+openrouter_api_key = "openrouter_api_key"
+""")
+        cfg = load_config(config_file)
+        assert cfg.users[0].skills.gog.email == "alice@example.com"
+
+    def test_gog_email_defaults_to_none(self, tmp_path: Path):
+        """Gog email is None when not specified."""
+        config_file = tmp_path / "clawctl.toml"
+        config_file.write_text("""\
+[clawctl]
+
+[[users]]
+name = "alice"
+
+[users.secrets]
+openrouter_api_key = "openrouter_api_key"
+""")
+        cfg = load_config(config_file)
+        assert cfg.users[0].skills.gog.email is None

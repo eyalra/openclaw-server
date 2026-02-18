@@ -31,7 +31,7 @@ class BackupManager:
 
     def __init__(self, config: Config) -> None:
         self.config = config
-        self.paths = Paths(config.clawctl.data_root)
+        self.paths = Paths(config.clawctl.data_root, config.clawctl.build_root)
         self.backup_config = config.clawctl.backup
 
     def init_user_backup(self, username: str) -> None:
@@ -252,7 +252,7 @@ def _run_daemon_main() -> None:
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
         handlers=[
-            logging.FileHandler(Paths(config.clawctl.data_root).logs_dir / "backup.log"),
+            logging.FileHandler(Paths(config.clawctl.data_root, config.clawctl.build_root).logs_dir / "backup.log"),
             logging.StreamHandler(),
         ],
     )

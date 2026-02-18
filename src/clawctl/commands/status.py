@@ -27,7 +27,7 @@ def status(
     """Show the status of all user containers."""
     cfg = load_config_or_exit(config)
     docker = DockerManager(cfg)
-    secrets_mgr = SecretsManager(Paths(cfg.clawctl.data_root))
+    secrets_mgr = SecretsManager(Paths(cfg.clawctl.data_root, cfg.clawctl.build_root))
     statuses = docker.get_all_statuses()
 
     table = Table(title="Container Status")

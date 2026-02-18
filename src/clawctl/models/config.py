@@ -28,6 +28,40 @@ class UserAgentConfig(BaseModel):
     model: str = "openrouter/z-ai/glm-4.5-air:free"
 
 
+class GogSkillConfig(BaseModel):
+    """Configuration for the gog (Google) skill.
+
+    The email identifies which Google account the skill will access.
+    It is written into openclaw.json (not a secret).
+    The API key is still stored as a secret file.
+    """
+
+    enabled: bool = True
+    email: str | None = None
+
+
+class SkillsConfig(BaseModel):
+    """OpenClaw skills configuration.
+
+    Each skill can be enabled/disabled. When enabled, certain skills require
+    specific API keys that will be prompted for during user provisioning.
+    """
+
+    gog: GogSkillConfig = GogSkillConfig()
+    gemini: bool = True
+    coding_agent: bool = True
+    github: bool = True
+
+
+# Mapping of skill name to required secret filenames
+SKILL_REQUIRED_SECRETS = {
+    "gog": ["gog_api_key", "gog_keyring_password"],
+    "gemini": [],  # uses interactive OAuth login via `gemini` binary, no API key needed
+    "coding_agent": [],  # coding-agent doesn't require external API keys
+    "github": [],  # uses `gh auth login` interactive flow, no secret needed at provision time
+}
+
+
 class UserSecretsConfig(BaseModel):
     """Flexible secret mapping: logical name → secret filename.
 
@@ -48,7 +82,9 @@ class UserConfig(BaseModel):
     name: str
     channels: ChannelsConfig = ChannelsConfig()
     agent: UserAgentConfig = UserAgentConfig()
+    skills: SkillsConfig = SkillsConfig()
     secrets: UserSecretsConfig
+    workspace_template: Path | None = None
 
     @field_validator("name")
     @classmethod
@@ -73,10 +109,13 @@ class BackupConfig(BaseModel):
 
 class DefaultsConfig(BaseModel):
     model: str = "openrouter/z-ai/glm-4.5-air:free"
+    skills: SkillsConfig = SkillsConfig()
+    workspace_template: Path | None = None
 
 
 class ClawctlSettings(BaseModel):
-    data_root: Path
+    data_root: Path = Path("data")
+    build_root: Path = Path("build")
     openclaw_version: str = "latest"
     image_name: str = "openclaw-instance"
     log_level: str = Field(default="info", pattern=r"^(debug|info|warning|error)$")

@@ -8,28 +8,34 @@ from pathlib import Path
 class Paths:
     """Resolves all host-side paths for a clawctl deployment.
 
-    Layout:
-        <data_root>/
-        ├── .backup.pid
-        ├── logs/
+    Two separate roots keep infrastructure (disposable) apart from
+    persistent user state (sacred):
+
+        <build_root>/           ← infrastructure, safe to delete
+        └── logs/
+
+        <data_root>/            ← persistent user state, never auto-deleted
         ├── secrets/<username>/
         └── users/<username>/
             ├── openclaw/       # bind-mounted into container
             └── backup/         # git backup repo
     """
 
-    def __init__(self, data_root: Path) -> None:
+    def __init__(self, data_root: Path, build_root: Path | None = None) -> None:
         self.data_root = Path(data_root).resolve()
+        self.build_root = Path(build_root).resolve() if build_root else self.data_root
 
-    # --- Top-level ---
+    # --- Build root (infrastructure, disposable) ---
 
     @property
     def logs_dir(self) -> Path:
-        return self.data_root / "logs"
+        return self.build_root / "logs"
 
     @property
     def backup_pid_file(self) -> Path:
-        return self.data_root / ".backup.pid"
+        return self.build_root / ".backup.pid"
+
+    # --- Data root (persistent user state) ---
 
     @property
     def secrets_root(self) -> Path:
@@ -71,7 +77,8 @@ class Paths:
 
     def ensure_base_dirs(self) -> None:
         """Create base directory structure."""
-        self.data_root.mkdir(parents=True, exist_ok=True)
+        self.build_root.mkdir(parents=True, exist_ok=True)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
+        self.data_root.mkdir(parents=True, exist_ok=True)
         self.secrets_root.mkdir(parents=True, exist_ok=True)
         self.users_root.mkdir(parents=True, exist_ok=True)

@@ -37,10 +37,10 @@ def user_add(
         raise typer.Exit(1)
 
     manager = UserManager(cfg)
-    secrets_mgr = SecretsManager(Paths(cfg.clawctl.data_root))
+    secrets_mgr = SecretsManager(Paths(cfg.clawctl.data_root, cfg.clawctl.build_root))
 
     # Collect required secrets interactively
-    required = secrets_mgr.get_required_secrets(user)
+    required = secrets_mgr.get_required_secrets(user, cfg.clawctl.defaults)
     secret_values: dict[str, str] = {}
 
     console.print(f"Provisioning user [bold]{name}[/bold]...")
@@ -114,7 +114,7 @@ def user_list(
     """List all configured users and their container status."""
     cfg = load_config_or_exit(config)
     docker = DockerManager(cfg)
-    secrets_mgr = SecretsManager(Paths(cfg.clawctl.data_root))
+    secrets_mgr = SecretsManager(Paths(cfg.clawctl.data_root, cfg.clawctl.build_root))
     statuses = docker.get_all_statuses()
 
     table = Table(title="Users")

@@ -61,6 +61,9 @@ def generate_openclaw_config(
             # Token read from DISCORD_TOKEN env var
         }
 
+    if user.skills.gog.enabled and user.skills.gog.email:
+        config.setdefault("hooks", {})["gmail"] = {"account": user.skills.gog.email}
+
     return config
 
 

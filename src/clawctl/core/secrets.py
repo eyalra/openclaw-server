@@ -65,38 +65,83 @@ class SecretsManager:
         if secret_dir.is_dir():
             shutil.rmtree(secret_dir)
 
-    def get_required_secrets(self, user_config) -> list[tuple[str, str]]:
+    def get_required_secrets(self, user_config, defaults=None) -> list[tuple[str, str]]:
         """Get list of (secret_name, description) required for a user config.
 
-        Examines the user's secrets mapping and enabled channels to determine
-        what's needed.  Each entry in user_config.secrets (extra fields) maps
-        a logical name to a secret filename.
+        Examines the user's secrets mapping, enabled channels, and enabled skills
+        to determine what's needed. Each entry in user_config.secrets (extra fields)
+        maps a logical name to a secret filename.
+
+        Args:
+            user_config: The user's configuration.
+            defaults: Optional DefaultsConfig for skill inheritance.
         """
+        from clawctl.models.config import SKILL_REQUIRED_SECRETS
+
         required: list[tuple[str, str]] = []
+        seen: set[str] = set()  # Track to avoid duplicates
 
         # Collect all explicitly declared secrets from the [users.secrets] block.
         # Pydantic's extra="allow" stores them in model_extra.
         extras = user_config.secrets.model_extra or {}
         for logical_name, secret_filename in extras.items():
-            description = logical_name.replace("_", " ").title()
-            required.append((secret_filename, description))
+            if secret_filename not in seen:
+                description = logical_name.replace("_", " ").title()
+                required.append((secret_filename, description))
+                seen.add(secret_filename)
+
+        # Collect skill-required secrets
+        skills = user_config.skills
+        if defaults:
+            # Merge defaults with user-specific overrides
+            for skill_name in ["gog", "gemini", "coding_agent"]:
+                user_val = getattr(skills, skill_name, None)
+                default_val = getattr(defaults.skills, skill_name, False)
+                # A skill value may be a bool or an object with an .enabled attribute
+                user_enabled = user_val.enabled if hasattr(user_val, "enabled") else user_val
+                default_enabled = default_val.enabled if hasattr(default_val, "enabled") else default_val
+                # User setting takes precedence; if not set, use default
+                is_enabled = user_enabled if user_enabled is not None else default_enabled
+                if is_enabled and skill_name in SKILL_REQUIRED_SECRETS:
+                    for secret_name in SKILL_REQUIRED_SECRETS[skill_name]:
+                        if secret_name not in seen:
+                            description = f"{skill_name.replace('_', ' ').title()} API key"
+                            required.append((secret_name, description))
+                            seen.add(secret_name)
+        else:
+            # No defaults, just use user skills
+            for skill_name in ["gog", "gemini", "coding_agent"]:
+                val = getattr(skills, skill_name, False)
+                is_enabled = val.enabled if hasattr(val, "enabled") else bool(val)
+                if is_enabled and skill_name in SKILL_REQUIRED_SECRETS:
+                    for secret_name in SKILL_REQUIRED_SECRETS[skill_name]:
+                        if secret_name not in seen:
+                            description = f"{skill_name.replace('_', ' ').title()} API key"
+                            required.append((secret_name, description))
+                            seen.add(secret_name)
 
         # Slack secrets
         if user_config.channels.slack.enabled:
             if user_config.channels.slack.bot_token_secret:
-                required.append(
-                    (user_config.channels.slack.bot_token_secret, "Slack bot token")
-                )
+                if user_config.channels.slack.bot_token_secret not in seen:
+                    required.append(
+                        (user_config.channels.slack.bot_token_secret, "Slack bot token")
+                    )
+                    seen.add(user_config.channels.slack.bot_token_secret)
             if user_config.channels.slack.app_token_secret:
-                required.append(
-                    (user_config.channels.slack.app_token_secret, "Slack app token")
-                )
+                if user_config.channels.slack.app_token_secret not in seen:
+                    required.append(
+                        (user_config.channels.slack.app_token_secret, "Slack app token")
+                    )
+                    seen.add(user_config.channels.slack.app_token_secret)
 
         # Discord secrets
         if user_config.channels.discord.enabled:
             if user_config.channels.discord.token_secret:
-                required.append(
-                    (user_config.channels.discord.token_secret, "Discord bot token")
-                )
+                if user_config.channels.discord.token_secret not in seen:
+                    required.append(
+                        (user_config.channels.discord.token_secret, "Discord bot token")
+                    )
+                    seen.add(user_config.channels.discord.token_secret)
 
         return required

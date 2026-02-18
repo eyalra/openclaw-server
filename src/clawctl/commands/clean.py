@@ -1,4 +1,4 @@
-"""clawctl clean — tear down all resources and remove build artifacts."""
+"""clawctl clean — tear down infrastructure and optionally user data."""
 
 from __future__ import annotations
 
@@ -20,14 +20,20 @@ def clean(
         Optional[Path],
         typer.Option("--config", "-c", help="Path to clawctl.toml"),
     ] = None,
+    all_data: Annotated[
+        bool,
+        typer.Option("--all", help="Also remove persistent user data (secrets, backups, workspaces)"),
+    ] = False,
     yes: Annotated[
         bool,
         typer.Option("--yes", "-y", help="Skip confirmation prompt"),
     ] = False,
 ) -> None:
-    """Remove all containers, networks, build data, and config.
+    """Remove containers, networks, and build artifacts.
 
-    Restores the project to a fresh pre-init state.
+    By default only removes disposable infrastructure (build/, containers,
+    networks, clawctl.toml).  Pass --all to also delete the persistent data/
+    directory (user secrets, workspaces, backups).
     """
     cfg = load_config_or_exit(config)
 
@@ -35,8 +41,13 @@ def clean(
         console.print("[bold red]This will:[/bold red]")
         console.print("  • Stop and remove all OpenClaw containers")
         console.print("  • Remove all Docker networks")
-        console.print("  • Delete the build/ directory (all user data, secrets, backups)")
+        console.print(f"  • Delete build directory ({cfg.clawctl.build_root})")
         console.print("  • Delete clawctl.toml")
+        if all_data:
+            console.print(
+                f"  • [bold red]Delete ALL user data[/bold red] ({cfg.clawctl.data_root}) "
+                "— secrets, workspaces, backups"
+            )
         console.print()
         if not typer.confirm("Are you sure?", default=False):
             raise typer.Abort()
@@ -56,16 +67,27 @@ def clean(
             f"[yellow]Removed containers/networks:[/yellow] {', '.join(removed)}"
         )
 
-    # 2. Remove build directory
-    data_root = cfg.clawctl.data_root
-    if data_root.is_dir():
-        shutil.rmtree(data_root)
-        console.print(f"[yellow]Removed[/yellow] {data_root}")
+    # 2. Remove build directory (disposable infrastructure)
+    build_root = cfg.clawctl.build_root
+    if build_root.is_dir():
+        shutil.rmtree(build_root)
+        console.print(f"[yellow]Removed[/yellow] {build_root}")
 
-    # 3. Remove config file
+    # 3. Optionally remove data directory (persistent user state)
+    if all_data:
+        data_root = cfg.clawctl.data_root
+        if data_root.is_dir():
+            shutil.rmtree(data_root)
+            console.print(f"[red]Removed[/red] {data_root}")
+
+    # 4. Remove config file
     config_file = Path("clawctl.toml")
     if config_file.is_file():
         config_file.unlink()
         console.print("[yellow]Removed[/yellow] clawctl.toml")
 
-    console.print("[green]Clean complete — back to a fresh state.[/green]")
+    if all_data:
+        console.print("[green]Full clean complete — everything removed.[/green]")
+    else:
+        console.print("[green]Clean complete — infrastructure removed, user data preserved.[/green]")
+        console.print("[dim]Run with --all to also remove user data.[/dim]")
