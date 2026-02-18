@@ -20,11 +20,13 @@ user_app = typer.Typer(help="Manage users", no_args_is_help=True)
 backup_app = typer.Typer(help="Manage backups", no_args_is_help=True)
 backup_schedule_app = typer.Typer(help="Manage backup scheduling", no_args_is_help=True)
 config_app = typer.Typer(help="Configuration utilities", no_args_is_help=True)
+gog_app = typer.Typer(help="Manage gog Google Workspace integration", no_args_is_help=True)
 
 app.add_typer(user_app, name="user")
 app.add_typer(backup_app, name="backup")
 backup_app.add_typer(backup_schedule_app, name="schedule")
 app.add_typer(config_app, name="config")
+app.add_typer(gog_app, name="gog")
 
 # Global option for config file path
 ConfigOption = Annotated[
@@ -59,6 +61,7 @@ from clawctl.commands.backup import backup_run, schedule_start, schedule_stop, s
 from clawctl.commands.config_cmd import validate  # noqa: E402
 from clawctl.commands.update import update  # noqa: E402
 from clawctl.commands.clean import clean  # noqa: E402
+from clawctl.commands.gog import gog_setup, gog_test  # noqa: E402
 
 # Register top-level commands
 app.command()(init)
@@ -83,3 +86,6 @@ backup_schedule_app.command(name="stop")(schedule_stop)
 backup_schedule_app.command(name="status")(schedule_status)
 
 config_app.command(name="validate")(validate)
+
+gog_app.command(name="setup")(gog_setup)
+gog_app.command(name="test")(gog_test)

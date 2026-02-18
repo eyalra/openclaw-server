@@ -50,6 +50,11 @@ coding_agent = true
 github = true       # auth: run `gh auth login` inside the container to authenticate
 
 # gog requires a per-user email — configure it per-user via [users.skills.gog]
+# Secrets prompted on user add: gog_client_id, gog_client_secret, gog_keyring_password
+#   gog_client_id / gog_client_secret: from Google Cloud Console → APIs & Services → Credentials
+#                                       Create an OAuth 2.0 Client ID (Desktop app type)
+#   gog_keyring_password: any passphrase you choose to encrypt stored OAuth tokens on disk
+# After provisioning, run `clawctl gog setup <username>` to complete OAuth token exchange.
 [clawctl.defaults.skills.gog]
 enabled = true
 
@@ -75,8 +80,7 @@ name = "alice"
 # gemini = false   # disable a skill for this user
 # coding_agent = true
 
-# gog requires the user's Google account email
-# Secrets prompted on user add: gog_api_key, gog_keyring_password
+# gog: set the user's Google account email here (not a secret — written to openclaw.json)
 [users.skills.gog]
 enabled = true
 email = "alice@example.com"

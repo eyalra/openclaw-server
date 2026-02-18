@@ -17,7 +17,8 @@ class Paths:
         <data_root>/            ← persistent user state, never auto-deleted
         ├── secrets/<username>/
         └── users/<username>/
-            ├── openclaw/       # bind-mounted into container
+            ├── openclaw/       # bind-mounted as /home/node/.openclaw
+            ├── config/         # bind-mounted as /home/node/.config (gog keyring, etc.)
             └── backup/         # git backup repo
     """
 
@@ -63,6 +64,14 @@ class Paths:
     def user_backup_dir(self, username: str) -> Path:
         return self.user_dir(username) / "backup"
 
+    def user_config_dir(self, username: str) -> Path:
+        """The directory bind-mounted as /home/node/.config in the container.
+
+        Persists tool configuration that lives outside /home/node/.openclaw,
+        such as gog's OAuth credentials and keyring files (~/.config/gogcli/).
+        """
+        return self.user_dir(username) / "config"
+
     def user_secrets_dir(self, username: str) -> Path:
         return self.secrets_root / username
 
@@ -73,6 +82,7 @@ class Paths:
         self.user_openclaw_dir(username).mkdir(parents=True, exist_ok=True)
         self.user_workspace_dir(username).mkdir(parents=True, exist_ok=True)
         self.user_backup_dir(username).mkdir(parents=True, exist_ok=True)
+        self.user_config_dir(username).mkdir(parents=True, exist_ok=True)
         self.user_secrets_dir(username).mkdir(parents=True, exist_ok=True)
 
     def ensure_base_dirs(self) -> None:

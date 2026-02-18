@@ -30,6 +30,7 @@ class TestPaths:
         paths = Paths(tmp_data_root, tmp_build_root)
         assert paths.user_openclaw_dir("alice") == tmp_data_root / "users" / "alice" / "openclaw"
         assert paths.user_backup_dir("alice") == tmp_data_root / "users" / "alice" / "backup"
+        assert paths.user_config_dir("alice") == tmp_data_root / "users" / "alice" / "config"
         assert paths.user_secrets_dir("alice") == tmp_data_root / "secrets" / "alice"
 
     def test_build_root_defaults_to_data_root(self, tmp_data_root: Path):
@@ -51,6 +52,7 @@ class TestPaths:
         assert paths.user_openclaw_dir("alice").is_dir()
         assert paths.user_workspace_dir("alice").is_dir()
         assert paths.user_backup_dir("alice").is_dir()
+        assert paths.user_config_dir("alice").is_dir()
         assert paths.user_secrets_dir("alice").is_dir()
 
 
@@ -107,8 +109,12 @@ class TestSecretsManager:
         defaults = DefaultsConfig()
         required = mgr.get_required_secrets(sample_user, defaults)
         names = [name for name, _ in required]
-        # gog requires API key and keyring password
-        assert "gog_api_key" in names
+        # gog requires OAuth client credentials and a keyring password
+        assert "gog_client_id" in names
+        assert "gog_client_secret" in names
+        assert "gog_keyring_password" in names
+        # the old name is gone
+        assert "gog_api_key" not in names
         # gemini uses OAuth login — no API key required at provision time
         assert "gemini_api_key" not in names
         # github uses gh auth login — no secret required at provision time

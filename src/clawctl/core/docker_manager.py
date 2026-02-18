@@ -131,6 +131,7 @@ class DockerManager:
         self.create_network(user.name)
 
         openclaw_dir = str(self.paths.user_openclaw_dir(user.name))
+        config_dir = str(self.paths.user_config_dir(user.name))
         secrets_dir = str(self.paths.user_secrets_dir(user.name))
 
         self.client.containers.create(
@@ -140,6 +141,8 @@ class DockerManager:
             network=_network_name(user.name),
             volumes={
                 openclaw_dir: {"bind": "/home/node/.openclaw", "mode": "rw"},
+                # Persist ~/.config so tools like gog store credentials across restarts
+                config_dir: {"bind": "/home/node/.config", "mode": "rw"},
                 secrets_dir: {"bind": "/run/secrets", "mode": "ro"},
             },
             ports={"18789/tcp": None},  # random host port

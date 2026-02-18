@@ -81,15 +81,26 @@ class SecretsManager:
         required: list[tuple[str, str]] = []
         seen: set[str] = set()  # Track to avoid duplicates
 
+        # Skill-specific secret descriptions for better UX
+        SKILL_SECRET_DESCRIPTIONS = {
+            "gog_client_id": "Google OAuth Client ID",
+            "gog_client_secret": "Google OAuth Client Secret",
+            "gog_keyring_password": "Gog keyring encryption password",
+        }
+
         # Collect all explicitly declared secrets from the [users.secrets] block.
         # Pydantic's extra="allow" stores them in model_extra.
         extras = user_config.secrets.model_extra or {}
         for logical_name, secret_filename in extras.items():
             if secret_filename not in seen:
-                description = logical_name.replace("_", " ").title()
+                # Use specific description if available, otherwise generate from name
+                description = SKILL_SECRET_DESCRIPTIONS.get(
+                    secret_filename,
+                    logical_name.replace("_", " ").title()
+                )
                 required.append((secret_filename, description))
                 seen.add(secret_filename)
-
+        
         # Collect skill-required secrets
         skills = user_config.skills
         if defaults:
@@ -105,7 +116,11 @@ class SecretsManager:
                 if is_enabled and skill_name in SKILL_REQUIRED_SECRETS:
                     for secret_name in SKILL_REQUIRED_SECRETS[skill_name]:
                         if secret_name not in seen:
-                            description = f"{skill_name.replace('_', ' ').title()} API key"
+                            # Use specific description if available, otherwise fallback to generic
+                            description = SKILL_SECRET_DESCRIPTIONS.get(
+                                secret_name,
+                                f"{skill_name.replace('_', ' ').title()} API key"
+                            )
                             required.append((secret_name, description))
                             seen.add(secret_name)
         else:
@@ -116,7 +131,11 @@ class SecretsManager:
                 if is_enabled and skill_name in SKILL_REQUIRED_SECRETS:
                     for secret_name in SKILL_REQUIRED_SECRETS[skill_name]:
                         if secret_name not in seen:
-                            description = f"{skill_name.replace('_', ' ').title()} API key"
+                            # Use specific description if available, otherwise fallback to generic
+                            description = SKILL_SECRET_DESCRIPTIONS.get(
+                                secret_name,
+                                f"{skill_name.replace('_', ' ').title()} API key"
+                            )
                             required.append((secret_name, description))
                             seen.add(secret_name)
 

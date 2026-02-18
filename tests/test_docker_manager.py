@@ -90,3 +90,25 @@ class TestDockerManager:
         assert "testuser" in statuses
         assert statuses["testuser"]["status"] == "running"
         assert statuses["testuser"]["port"] == "54321"
+
+    def test_create_container_mounts_config_dir(
+        self, manager: DockerManager, mock_client, sample_user
+    ):
+        """create_container must mount the config dir for persistent ~/.config."""
+        mock_client.networks.get.side_effect = docker.errors.NotFound("not found")
+        manager.create_container(sample_user)
+
+        call_kwargs = mock_client.containers.create.call_args.kwargs
+        volumes = call_kwargs["volumes"]
+
+        # Verify /home/node/.config is mounted
+        binds = {v["bind"]: v for v in volumes.values()}
+        assert "/home/node/.config" in binds, (
+            "Expected /home/node/.config volume mount for persistent gog credentials"
+        )
+        assert binds["/home/node/.config"]["mode"] == "rw"
+
+        # Verify /home/node/.openclaw and /run/secrets are still present
+        assert "/home/node/.openclaw" in binds
+        assert "/run/secrets" in binds
+        assert binds["/run/secrets"]["mode"] == "ro"

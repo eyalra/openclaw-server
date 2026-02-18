@@ -53,9 +53,14 @@ class SkillsConfig(BaseModel):
     github: bool = True
 
 
-# Mapping of skill name to required secret filenames
+# Mapping of skill name to required secret filenames.
+# gog uses Google Cloud OAuth 2.0:
+#   gog_client_id / gog_client_secret  — from Google Cloud Console (Desktop app OAuth client)
+#   gog_keyring_password               — encrypts stored refresh tokens on disk
+# The entrypoint seeds gog credentials from GOG_CLIENT_ID / GOG_CLIENT_SECRET on first start.
+# After provisioning, run `clawctl gog setup <username>` to complete the OAuth token exchange.
 SKILL_REQUIRED_SECRETS = {
-    "gog": ["gog_api_key", "gog_keyring_password"],
+    "gog": ["gog_client_id", "gog_client_secret", "gog_keyring_password"],
     "gemini": [],  # uses interactive OAuth login via `gemini` binary, no API key needed
     "coding_agent": [],  # coding-agent doesn't require external API keys
     "github": [],  # uses `gh auth login` interactive flow, no secret needed at provision time

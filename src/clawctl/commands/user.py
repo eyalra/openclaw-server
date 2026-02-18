@@ -14,6 +14,7 @@ from clawctl.core.docker_manager import DockerManager
 from clawctl.core.secrets import SecretsManager
 from clawctl.core.paths import Paths
 from clawctl.core.user_manager import GATEWAY_TOKEN_SECRET_NAME, UserManager
+from clawctl.commands.gog import _get_docker_client, run_gog_auth
 
 console = Console()
 
@@ -49,17 +50,44 @@ def user_add(
     for secret_name, description in required:
         # Check if secret already exists
         if secrets_mgr.secret_exists(name, secret_name):
-            if not typer.confirm(
-                f"  Secret '{secret_name}' ({description}) already exists. Overwrite?",
-                default=False,
-            ):
+            console.print(
+                f"  [yellow]Secret '{secret_name}' ({description}) already exists.[/yellow]"
+            )
+            try:
+                overwrite = typer.confirm(
+                    "  Do you want to overwrite it?",
+                    default=False,
+                )
+            except (KeyboardInterrupt, EOFError):
+                console.print("\n[yellow]Aborted by user[/yellow]")
+                raise typer.Abort()
+            except Exception as e:
+                # Handle any unexpected input errors
+                console.print(f"  [red]Error reading input: {e}[/red]")
+                console.print("  [dim]Skipping this secret. Run the command again to retry.[/dim]")
+                continue
+            
+            if not overwrite:
+                console.print(f"  [dim]Skipping '{secret_name}'[/dim]")
                 continue
 
-        value = typer.prompt(
-            f"  Enter {description} ({secret_name})",
-            hide_input=True,
-        )
-        secret_values[secret_name] = value
+        try:
+            value = typer.prompt(
+                f"  Enter {description} ({secret_name})",
+                hide_input=True,
+            )
+        except (KeyboardInterrupt, EOFError):
+            console.print("\n[yellow]Aborted by user[/yellow]")
+            raise typer.Abort()
+        except Exception as e:
+            console.print(f"  [red]Error reading input: {e}[/red]")
+            console.print(f"  [dim]Skipping '{secret_name}'[/dim]")
+            continue
+            
+        if not value or not value.strip():
+            console.print(f"  [yellow]Empty value provided, skipping '{secret_name}'[/yellow]")
+            continue
+        secret_values[secret_name] = value.strip()
 
     console.print()
 
@@ -75,6 +103,38 @@ def user_add(
         if token:
             url += f"?token={token}"
         console.print(f"  Dashboard: [link={url}]{url}[/link]")
+
+    # Offer inline gog OAuth flow if gog is enabled and email is configured
+    if user.skills.gog.enabled and user.skills.gog.email:
+        console.print()
+        
+        # Check container status before attempting gog auth
+        docker_mgr = DockerManager(cfg)
+        container_status = docker_mgr.get_container_status(name)
+        
+        if container_status != "running":
+            console.print(
+                f"  [yellow]Container is not running (status: {container_status}).[/yellow]"
+            )
+            console.print(
+                f"  [dim]Start the container first, then run [bold]clawctl gog setup {name}[/bold] to authorize gog.[/dim]"
+            )
+        elif typer.confirm(
+            f"  Run gog Gmail authorization for {user.skills.gog.email} now?",
+            default=True,
+        ):
+            gog_client = _get_docker_client(cfg)
+            try:
+                run_gog_auth(name, user.skills.gog.email, gog_client, secrets_mgr=secrets_mgr)
+            except Exception as e:
+                console.print(f"  [red]Failed to run gog authorization: {e}[/red]")
+                console.print(
+                    f"  [dim]You can run [bold]clawctl gog setup {name}[/bold] later to authorize gog.[/dim]"
+                )
+        else:
+            console.print(
+                f"  [dim]Run [bold]clawctl gog setup {name}[/bold] later to authorize gog.[/dim]"
+            )
 
 
 def user_remove(
