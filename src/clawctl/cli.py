@@ -53,12 +53,12 @@ def main(
 
 # Import and register commands
 from clawctl.commands.init import init  # noqa: E402
-from clawctl.commands.user import user_add, user_list, user_remove  # noqa: E402
+from clawctl.commands.user import user_add, user_list, user_remove, user_set_slack  # noqa: E402
 from clawctl.commands.lifecycle import start, stop, restart, start_all, stop_all  # noqa: E402
 from clawctl.commands.status import status  # noqa: E402
 from clawctl.commands.logs import logs  # noqa: E402
 from clawctl.commands.backup import backup_run, schedule_start, schedule_stop, schedule_status  # noqa: E402
-from clawctl.commands.config_cmd import validate  # noqa: E402
+from clawctl.commands.config_cmd import validate, regenerate  # noqa: E402
 from clawctl.commands.update import update  # noqa: E402
 from clawctl.commands.clean import clean  # noqa: E402
 from clawctl.commands.gog import gog_setup, gog_test  # noqa: E402
@@ -79,6 +79,7 @@ app.command()(clean)
 user_app.command(name="add")(user_add)
 user_app.command(name="remove")(user_remove)
 user_app.command(name="list")(user_list)
+user_app.command(name="set-slack")(user_set_slack)
 
 backup_app.command(name="run")(backup_run)
 backup_schedule_app.command(name="start")(schedule_start)
@@ -86,6 +87,7 @@ backup_schedule_app.command(name="stop")(schedule_stop)
 backup_schedule_app.command(name="status")(schedule_status)
 
 config_app.command(name="validate")(validate)
+config_app.command(name="regenerate")(regenerate)
 
 gog_app.command(name="setup")(gog_setup)
 gog_app.command(name="test")(gog_test)

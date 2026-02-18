@@ -209,3 +209,98 @@ def user_list(
         )
 
     console.print(table)
+
+
+def user_set_slack(
+    name: Annotated[str, typer.Argument(help="Username")],
+    bot_token: Annotated[
+        Optional[str],
+        typer.Option("--bot-token", help="Slack Bot User OAuth Token (xoxb-...)"),
+    ] = None,
+    app_token: Annotated[
+        Optional[str],
+        typer.Option("--app-token", help="Slack App-Level Token (xapp-...)"),
+    ] = None,
+    config: Annotated[
+        Optional[Path],
+        typer.Option("--config", "-c", help="Path to clawctl.toml"),
+    ] = None,
+) -> None:
+    """Set Slack tokens for a user.
+    
+    Prompts for tokens interactively if not provided via options.
+    After setting tokens, regenerates openclaw.json and restarts the container.
+    """
+    cfg = load_config_or_exit(config)
+    user = cfg.get_user(name)
+    
+    if user is None:
+        console.print(
+            f"[red]User '{name}' not found in config.[/red] "
+            f"Add a [[users]] block with name = \"{name}\" to clawctl.toml first."
+        )
+        raise typer.Exit(1)
+    
+    if not user.channels.slack.enabled:
+        console.print(
+            f"[yellow]Slack is not enabled for '{name}'.[/yellow] "
+            "Set [users.channels.slack] enabled = true in clawctl.toml first."
+        )
+        raise typer.Exit(1)
+    
+    # Get token values
+    if not bot_token:
+        bot_token = typer.prompt(
+            "Enter Slack Bot User OAuth Token (xoxb-...)",
+            hide_input=True,
+        )
+    
+    if not app_token:
+        app_token = typer.prompt(
+            "Enter Slack App-Level Token (xapp-...)",
+            hide_input=True,
+        )
+    
+    if not bot_token.strip() or not app_token.strip():
+        console.print("[red]Both tokens are required.[/red]")
+        raise typer.Exit(1)
+    
+    # Write secrets
+    paths = Paths(cfg.clawctl.data_root, cfg.clawctl.build_root)
+    secrets_mgr = SecretsManager(paths)
+    
+    bot_token_secret_name = user.channels.slack.bot_token_secret or "slack_bot_token"
+    app_token_secret_name = user.channels.slack.app_token_secret or "slack_app_token"
+    
+    secrets_mgr.write_secret(name, bot_token_secret_name, bot_token.strip())
+    secrets_mgr.write_secret(name, app_token_secret_name, app_token.strip())
+    
+    console.print(f"[green]✓[/green] Slack tokens saved for '{name}'")
+    
+    # Regenerate config
+    from clawctl.core.openclaw_config import write_openclaw_config
+    from clawctl.core.user_manager import GATEWAY_TOKEN_SECRET_NAME
+    
+    gateway_token = secrets_mgr.read_secret(name, GATEWAY_TOKEN_SECRET_NAME)
+    if not gateway_token:
+        import secrets as secrets_module
+        gateway_token = secrets_module.token_urlsafe(32)
+        secrets_mgr.write_secret(name, GATEWAY_TOKEN_SECRET_NAME, gateway_token)
+    
+    write_openclaw_config(
+        user,
+        cfg.clawctl.defaults,
+        paths.user_openclaw_config(name),
+        gateway_token=gateway_token,
+    )
+    
+    console.print(f"[green]✓[/green] Regenerated openclaw.json")
+    
+    # Restart container
+    docker_mgr = DockerManager(cfg)
+    if docker_mgr.container_exists(name):
+        console.print("Restarting container...")
+        docker_mgr.restart_container(name)
+        console.print(f"[green]✓[/green] Container restarted")
+    else:
+        console.print(f"[yellow]Container not found. Run 'clawctl user add {name}' first.[/yellow]")
