@@ -67,6 +67,15 @@ def load_config(path: Path) -> Config:
         else:
             setattr(config.clawctl, attr, value.expanduser().resolve())
 
+    # Resolve knowledge_dir relative to data_root if not absolute
+    if config.clawctl.knowledge_dir is not None:
+        kd = config.clawctl.knowledge_dir
+        if not kd.is_absolute():
+            # Resolve relative to data_root
+            config.clawctl.knowledge_dir = config.clawctl.data_root / kd
+        else:
+            config.clawctl.knowledge_dir = kd.expanduser().resolve()
+
     # Resolve workspace_template paths (global default and per-user)
     if config.clawctl.defaults.workspace_template is not None:
         wt = config.clawctl.defaults.workspace_template

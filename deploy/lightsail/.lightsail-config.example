@@ -1,0 +1,46 @@
+#!/bin/bash
+# AWS Lightsail Deployment Configuration
+# Copy this file to .lightsail-config and fill in your values
+# This file is gitignored - never commit your actual .lightsail-config
+
+# AWS Lightsail Instance Details
+LIGHTSAIL_IP=""                              # Your Lightsail instance IP (from SOP-01)
+LIGHTSAIL_INSTANCE_NAME="openclaw-server"    # Instance name in Lightsail console
+AWS_REGION="us-east-1"                       # AWS region (us-east-1, us-west-2, etc.)
+
+# SSH Configuration
+SSH_KEY="$HOME/.ssh/lightsail-key.pem"        # Path to your SSH private key (.pem file)
+SSH_USER="ubuntu"                            # SSH username (ubuntu for default, openclaw after hardening)
+SSH_PORT="22"                                # SSH port (22 initially, 2222 after hardening)
+
+# Tailscale Configuration (filled after SOP-03)
+TAILSCALE_IP=""                              # Tailscale IP address (100.x.x.x format)
+TAILSCALE_AUTH_KEY=""                        # Optional: Pre-auth key for automation (not needed for manual setup)
+
+# Deployment Paths
+REMOTE_HOME="/home/openclaw"                 # Remote user home directory
+REMOTE_REPO_PATH="/home/openclaw/openclaw"   # Path to cloned repository on server
+REMOTE_CONFIG_PATH="/home/openclaw/openclaw/clawctl.toml"  # Remote config file path
+
+# Local Paths (auto-detected, but can override)
+LOCAL_REPO_PATH="$(git rev-parse --show-toplevel 2>/dev/null || echo '')"  # Auto-detected from git
+LOCAL_DEPLOY_DIR="deploy/lightsail"          # This directory (relative to repo root)
+
+# S3 Configuration (optional, for future S3 sync)
+S3_BUCKET=""                                 # S3 bucket name for backups
+S3_PREFIX="openclaw-backups"                 # S3 key prefix for backups
+S3_REGION="us-east-1"                        # S3 bucket region
+
+# Snapshot Configuration (optional)
+SNAPSHOT_PREFIX="openclaw"                   # Prefix for snapshot names
+KEEP_SNAPSHOTS=7                             # Number of snapshots to keep
+
+# Security
+ALLOWED_SSH_IPS=""                           # Comma-separated IPs for SSH (optional, for additional restrictions)
+
+# Discord Configuration (optional, for reference)
+# DISCORD_BOT_TOKEN=""                       # Discord bot token (stored in secrets/, not here)
+
+# Model Provider Configuration (optional, for reference)
+# ANTHROPIC_API_KEY=""                       # Stored in secrets/, not here
+# OPENROUTER_API_KEY=""                      # Stored in secrets/, not here

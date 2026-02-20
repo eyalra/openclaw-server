@@ -43,7 +43,9 @@ class SecretsManager:
         """Read a secret value. Returns None if the file doesn't exist."""
         secret_file = self.paths.user_secrets_dir(username) / name
         if secret_file.is_file():
-            return secret_file.read_text()
+            content = secret_file.read_text()
+            # Strip whitespace (including newlines) from secret values
+            return content.strip() if content else None
         return None
 
     def secret_exists(self, username: str, name: str) -> bool:

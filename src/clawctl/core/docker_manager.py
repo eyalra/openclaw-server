@@ -134,17 +134,34 @@ class DockerManager:
         config_dir = str(self.paths.user_config_dir(user.name))
         secrets_dir = str(self.paths.user_secrets_dir(user.name))
 
+        # Build volumes dictionary
+        volumes = {
+            openclaw_dir: {"bind": "/home/node/.openclaw", "mode": "rw"},
+            # Persist ~/.config so tools like gog store credentials across restarts
+            config_dir: {"bind": "/home/node/.config", "mode": "rw"},
+            secrets_dir: {"bind": "/run/secrets", "mode": "ro"},
+        }
+
+        # Add knowledge directory mount if configured and exists
+        knowledge_dir = self.config.clawctl.knowledge_dir
+        if knowledge_dir:
+            knowledge_path = Path(knowledge_dir)
+            # Resolve relative to data_root if not absolute
+            if not knowledge_path.is_absolute():
+                knowledge_path = self.paths.data_root / knowledge_path
+            else:
+                knowledge_path = knowledge_path.resolve()
+
+            if knowledge_path.exists() and knowledge_path.is_dir():
+                volumes[str(knowledge_path)] = {"bind": "/mnt/knowledge", "mode": "ro"}
+            # If not exists, silently skip (knowledge dir is optional)
+
         self.client.containers.create(
             image=self.image_tag,
             name=name,
             user="1000:1000",
             network=_network_name(user.name),
-            volumes={
-                openclaw_dir: {"bind": "/home/node/.openclaw", "mode": "rw"},
-                # Persist ~/.config so tools like gog store credentials across restarts
-                config_dir: {"bind": "/home/node/.config", "mode": "rw"},
-                secrets_dir: {"bind": "/run/secrets", "mode": "ro"},
-            },
+            volumes=volumes,
             ports={"18789/tcp": None},  # random host port
             restart_policy={"Name": "unless-stopped"},
             detach=True,

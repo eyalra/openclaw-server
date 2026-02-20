@@ -43,3 +43,6 @@ Pipfile.lock
 data/
 clawctl.toml
 *.secrets
+
+# AWS Lightsail deployment configuration (contains sensitive data)
+deploy/lightsail/.lightsail-config

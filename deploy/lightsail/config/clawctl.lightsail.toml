@@ -1,0 +1,125 @@
+# clawctl.lightsail.toml — OpenClaw Deployment Configuration for AWS Lightsail
+#
+# This is a template configuration file.
+# Copy values to your actual clawctl.toml on the server after deployment.
+
+[clawctl]
+# Persistent user state (secrets, workspaces, backups) — never auto-deleted.
+data_root = "/home/openclaw/data"
+
+# Disposable infrastructure (logs, pid files) — safe to delete anytime.
+build_root = "/home/openclaw/build"
+
+# OpenClaw npm package version (pinned)
+openclaw_version = "latest"
+
+# Docker image name (tagged as <image_name>:<openclaw_version>)
+image_name = "openclaw-instance"
+
+# Log level for clawctl (debug, info, warning, error)
+log_level = "info"
+
+# Shared knowledge directory (read-only mount for all containers)
+# Mounted at /mnt/knowledge inside containers
+knowledge_dir = "/home/openclaw/data/knowledge"
+
+[clawctl.backup]
+# Enable periodic git-based backup of user memory/workspace files
+enabled = true
+
+# Backup interval in minutes (5–60)
+interval_minutes = 15
+
+# File patterns to include in backup (relative to user's openclaw dir)
+include_patterns = [
+    "workspace/**/*.md",
+    "workspace/**/*.json",
+    "openclaw.json",
+]
+
+[clawctl.defaults]
+# Default AI model for new users
+# Options:
+#   - "openrouter/z-ai/glm-4.5-air:free" (free, for testing)
+#   - "anthropic/claude-sonnet-4-20250514" (production quality)
+model = "openrouter/z-ai/glm-4.5-air:free"
+
+# Default workspace template directory (optional)
+# workspace_template = "templates/default"
+
+# Default skills enabled for all users (can be overridden per-user)
+[clawctl.defaults.skills]
+gemini = true       # auth: run `gemini` once interactively to complete OAuth login
+coding_agent = true
+github = true       # auth: run `gh auth login` inside the container to authenticate
+
+# gog requires a per-user email — configure it per-user via [users.skills.gog]
+# Secrets prompted on user add: gog_client_id, gog_client_secret, gog_keyring_password
+[clawctl.defaults.skills.gog]
+enabled = true
+
+# --- Users ---
+# Add one [[users]] block per team member.
+# Secret values are stored in separate files under data/secrets/<name>/
+# The secret names below refer to filenames, not the actual values.
+
+[[users]]
+name = "user1"
+
+# Per-user workspace template (overrides global default).
+# workspace_template = "templates/user1-custom"
+
+# Per-user skill configuration (overrides global defaults)
+# [users.skills]
+# gemini = false   # disable a skill for this user
+# coding_agent = true
+
+# gog: set the user's Google account email here (not a secret — written to openclaw.json)
+[users.skills.gog]
+enabled = true
+# email = "user1@example.com"
+
+# Secrets (prompted during 'clawctl user add')
+# Each key becomes an env var inside the container (uppercased).
+[users.secrets]
+# Choose one or both:
+anthropic_api_key = "anthropic_api_key"      # For Anthropic Claude
+openrouter_api_key = "openrouter_api_key"    # For OpenRouter (cheaper models)
+discord_token = "discord_token"              # Discord bot token
+
+# Agent configuration
+[users.agent]
+model = "openrouter/z-ai/glm-4.5-air:free"  # Can override default model
+
+# Channel configuration
+[users.channels.discord]
+enabled = true
+token_secret = "discord_token"
+
+[users.channels.slack]
+enabled = false
+# For future Slack migration:
+# bot_token_secret = "slack_bot_token"
+# app_token_secret = "slack_app_token"
+
+[[users]]
+name = "user2"
+
+[users.skills.gog]
+enabled = true
+# email = "user2@example.com"
+
+[users.secrets]
+anthropic_api_key = "anthropic_api_key"
+openrouter_api_key = "openrouter_api_key"
+discord_token = "discord_token"
+
+[users.agent]
+model = "openrouter/z-ai/glm-4.5-air:free"
+
+[users.channels.discord]
+enabled = true
+token_secret = "discord_token"
+
+[users.channels.slack]
+enabled = false

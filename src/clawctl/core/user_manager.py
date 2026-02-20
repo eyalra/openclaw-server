@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import os
 import secrets
 import shutil
+import subprocess
 
 from pathlib import Path
 
@@ -78,6 +80,27 @@ class UserManager:
         """
         # 1. Create directory structure
         self.paths.ensure_user_dirs(user.name)
+        
+        # Fix permissions for container access (container runs as UID 1000)
+        # Try to chown to 1000:1000 if we have permissions, otherwise log a warning
+        openclaw_dir = self.paths.user_openclaw_dir(user.name)
+        try:
+            # Try to change ownership to UID 1000 (container user)
+            # This may require sudo, so we try and fail gracefully
+            subprocess.run(
+                ["chown", "-R", "1000:1000", str(openclaw_dir)],
+                check=False,
+                capture_output=True,
+            )
+            # Set permissions to allow container user to read/write
+            os.chmod(openclaw_dir, 0o775)
+            workspace_dir = self.paths.user_workspace_dir(user.name)
+            if workspace_dir.exists():
+                os.chmod(workspace_dir, 0o775)
+        except (PermissionError, FileNotFoundError):
+            # If chown fails (needs sudo) or chmod fails, that's okay
+            # The deployment script should handle permissions
+            pass
 
         # 2. Copy workspace template (if configured)
         template_dir = _resolve_template_dir(user, self.config.clawctl.defaults)

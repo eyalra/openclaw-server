@@ -124,6 +124,7 @@ class ClawctlSettings(BaseModel):
     openclaw_version: str = "latest"
     image_name: str = "openclaw-instance"
     log_level: str = Field(default="info", pattern=r"^(debug|info|warning|error)$")
+    knowledge_dir: Path | None = None  # Optional shared knowledge directory (read-only mount)
     backup: BackupConfig = BackupConfig()
     defaults: DefaultsConfig = DefaultsConfig()
 
