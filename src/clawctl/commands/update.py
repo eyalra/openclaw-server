@@ -8,8 +8,8 @@ from typing import Annotated, Optional
 import typer
 from rich.console import Console
 
-from clawctl.core.config import load_config_or_exit
-from clawctl.core.docker_manager import DockerManager
+from clawlib.core.config import load_config_or_exit
+from clawlib.core.docker_manager import DockerManager
 
 console = Console()
 

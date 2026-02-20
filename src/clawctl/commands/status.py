@@ -10,11 +10,11 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from clawctl.core.config import load_config_or_exit
-from clawctl.core.docker_manager import DockerManager
-from clawctl.core.paths import Paths
-from clawctl.core.secrets import SecretsManager
-from clawctl.core.user_manager import GATEWAY_TOKEN_SECRET_NAME
+from clawlib.core.config import load_config_or_exit
+from clawlib.core.docker_manager import DockerManager
+from clawlib.core.paths import Paths
+from clawlib.core.secrets import SecretsManager
+from clawlib.core.user_manager import GATEWAY_TOKEN_SECRET_NAME
 
 console = Console()
 

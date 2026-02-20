@@ -8,11 +8,11 @@ from typing import Annotated, Optional
 import typer
 from rich.console import Console
 
-from clawctl.core.config import find_config_path, load_config
-from clawctl.core.openclaw_config import write_openclaw_config
-from clawctl.core.paths import Paths
-from clawctl.core.secrets import SecretsManager
-from clawctl.core.user_manager import GATEWAY_TOKEN_SECRET_NAME
+from clawlib.core.config import find_config_path, load_config
+from clawlib.core.openclaw_config import write_openclaw_config
+from clawlib.core.paths import Paths
+from clawlib.core.secrets import SecretsManager
+from clawlib.core.user_manager import GATEWAY_TOKEN_SECRET_NAME
 
 console = Console()
 
@@ -63,7 +63,7 @@ def regenerate(
     Useful when enabling/disabling channels or changing settings without recreating the user.
     The container will need to be restarted to pick up the new configuration.
     """
-    from clawctl.core.config import load_config_or_exit
+    from clawlib.core.config import load_config_or_exit
     
     cfg = load_config_or_exit(config)
     user = cfg.get_user(name)

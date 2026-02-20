@@ -8,8 +8,8 @@ from typing import Annotated, Optional
 import typer
 from rich.console import Console
 
-from clawctl.core.backup_manager import BackupManager
-from clawctl.core.config import find_config_path, load_config_or_exit
+from clawlib.core.backup_manager import BackupManager
+from clawlib.core.config import find_config_path, load_config_or_exit
 
 console = Console()
 

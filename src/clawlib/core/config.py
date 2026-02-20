@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import os
 import sys
 import tomllib
 from pathlib import Path
 
 from pydantic import ValidationError
 
-from clawlib.models.config import Config
+from clawctl.models.config import Config
 
 # Config is searched relative to the current directory (project root).
 DEFAULT_CONFIG_PATHS = [
@@ -17,11 +18,18 @@ DEFAULT_CONFIG_PATHS = [
 
 
 def find_config_path(explicit_path: Path | None = None) -> Path | None:
-    """Find the config file, checking explicit path, then defaults."""
+    """Find the config file, checking explicit path, environment variable, then defaults."""
     if explicit_path is not None:
         if explicit_path.is_file():
             return explicit_path.resolve()
         return None
+
+    # Check environment variable
+    env_config = os.environ.get("CLAWCTL_CONFIG")
+    if env_config:
+        env_path = Path(env_config)
+        if env_path.is_file():
+            return env_path.resolve()
 
     for path in DEFAULT_CONFIG_PATHS:
         if path.is_file():

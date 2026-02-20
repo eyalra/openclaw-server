@@ -9,11 +9,11 @@ import subprocess
 
 from pathlib import Path
 
-from clawlib.core.docker_manager import DockerManager
-from clawlib.core.openclaw_config import write_openclaw_config
-from clawlib.core.paths import Paths
-from clawlib.core.secrets import SecretsManager
-from clawlib.models.config import Config, DefaultsConfig, UserConfig
+from clawctl.core.docker_manager import DockerManager
+from clawctl.core.openclaw_config import write_openclaw_config
+from clawctl.core.paths import Paths
+from clawctl.core.secrets import SecretsManager
+from clawctl.models.config import Config, DefaultsConfig, UserConfig
 
 GATEWAY_TOKEN_SECRET_NAME = "openclaw_gateway_token"
 

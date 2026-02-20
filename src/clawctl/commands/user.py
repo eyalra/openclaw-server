@@ -9,11 +9,11 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from clawctl.core.config import load_config_or_exit
-from clawctl.core.docker_manager import DockerManager
-from clawctl.core.secrets import SecretsManager
-from clawctl.core.paths import Paths
-from clawctl.core.user_manager import GATEWAY_TOKEN_SECRET_NAME, UserManager
+from clawlib.core.config import load_config_or_exit
+from clawlib.core.docker_manager import DockerManager
+from clawlib.core.secrets import SecretsManager
+from clawlib.core.paths import Paths
+from clawlib.core.user_manager import GATEWAY_TOKEN_SECRET_NAME, UserManager
 from clawctl.commands.gog import _get_docker_client, run_gog_auth
 
 console = Console()
@@ -278,8 +278,8 @@ def user_set_slack(
     console.print(f"[green]✓[/green] Slack tokens saved for '{name}'")
     
     # Regenerate config
-    from clawctl.core.openclaw_config import write_openclaw_config
-    from clawctl.core.user_manager import GATEWAY_TOKEN_SECRET_NAME
+    from clawlib.core.openclaw_config import write_openclaw_config
+    from clawlib.core.user_manager import GATEWAY_TOKEN_SECRET_NAME
     
     gateway_token = secrets_mgr.read_secret(name, GATEWAY_TOKEN_SECRET_NAME)
     if not gateway_token:

@@ -8,7 +8,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from clawctl.core.paths import Paths
+from clawlib.core.paths import Paths
 
 console = Console()
 

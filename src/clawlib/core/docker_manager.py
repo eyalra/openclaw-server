@@ -10,8 +10,8 @@ from typing import Iterator
 import docker
 import docker.errors
 
-from clawlib.core.paths import Paths
-from clawlib.models.config import Config, UserConfig
+from clawctl.core.paths import Paths
+from clawctl.models.config import Config, UserConfig
 
 CONTAINER_PREFIX = "openclaw"
 NETWORK_PREFIX = "openclaw-net"
@@ -130,16 +130,34 @@ class DockerManager:
         # Ensure network exists
         self.create_network(user.name)
 
-        openclaw_dir = str(self.paths.user_openclaw_dir(user.name))
-        config_dir = str(self.paths.user_config_dir(user.name))
-        secrets_dir = str(self.paths.user_secrets_dir(user.name))
+        openclaw_dir = self.paths.user_openclaw_dir(user.name)
+        workspace_dir = self.paths.user_workspace_dir(user.name)
+        config_dir = self.paths.user_config_dir(user.name)
+        secrets_dir = self.paths.user_secrets_dir(user.name)
+
+        # Ensure workspace directory exists with correct permissions
+        workspace_dir.mkdir(parents=True, exist_ok=True)
+        openclaw_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            # Try to set ownership to 1000:1000 (container user)
+            subprocess.run(
+                ["chown", "-R", "1000:1000", str(openclaw_dir)],
+                check=False,
+                capture_output=True,
+            )
+            # Ensure workspace is writable
+            os.chmod(workspace_dir, 0o775)
+            os.chmod(openclaw_dir, 0o775)
+        except (PermissionError, FileNotFoundError):
+            # Non-fatal - deployment script should handle permissions
+            pass
 
         # Build volumes dictionary
         volumes = {
-            openclaw_dir: {"bind": "/home/node/.openclaw", "mode": "rw"},
+            str(openclaw_dir): {"bind": "/home/node/.openclaw", "mode": "rw"},
             # Persist ~/.config so tools like gog store credentials across restarts
-            config_dir: {"bind": "/home/node/.config", "mode": "rw"},
-            secrets_dir: {"bind": "/run/secrets", "mode": "ro"},
+            str(config_dir): {"bind": "/home/node/.config", "mode": "rw"},
+            str(secrets_dir): {"bind": "/run/secrets", "mode": "ro"},
         }
 
         # Add knowledge directory mount if configured and exists

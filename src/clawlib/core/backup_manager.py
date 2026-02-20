@@ -15,8 +15,8 @@ from pathlib import Path
 import git
 import schedule
 
-from clawlib.core.paths import Paths
-from clawlib.models.config import BackupConfig, Config
+from clawctl.core.paths import Paths
+from clawctl.models.config import BackupConfig, Config
 
 logger = logging.getLogger(__name__)
 

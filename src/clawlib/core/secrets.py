@@ -6,7 +6,7 @@ import os
 import stat
 from pathlib import Path
 
-from clawlib.core.paths import Paths
+from clawctl.core.paths import Paths
 
 
 class SecretsManager:
@@ -33,10 +33,46 @@ class SecretsManager:
         """
         secret_dir = self.paths.user_secrets_dir(username)
         secret_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Ensure the directory is writable by the current user
+        # If the directory exists but isn't writable, try to fix permissions
+        if secret_dir.exists() and not os.access(secret_dir, os.W_OK):
+            try:
+                os.chmod(secret_dir, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)  # 0755
+            except (PermissionError, OSError):
+                pass
 
         secret_file = secret_dir / name
+        
+        # If file exists and we can't write to it, try to remove it first
+        # (might be owned by a different user)
+        if secret_file.exists() and not os.access(secret_file, os.W_OK):
+            try:
+                secret_file.unlink()
+            except (PermissionError, OSError):
+                # If we can't remove it, try to overwrite anyway
+                # This will raise PermissionError if it fails
+                pass
+        
         secret_file.write_text(value)
-        os.chmod(secret_file, stat.S_IRUSR | stat.S_IWUSR)  # 0600
+        # Use 0644 so the container user (UID 1000) can read it
+        # The directory is mounted read-only, so we need readable permissions
+        os.chmod(secret_file, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)  # 0644
+        
+        # Try to chown to 1000:1000 (container user) if we have permissions
+        # This ensures the container can read the secret file
+        try:
+            import subprocess
+            subprocess.run(
+                ["chown", "1000:1000", str(secret_file)],
+                check=False,
+                capture_output=True,
+            )
+        except (FileNotFoundError, PermissionError):
+            # chown not available or no permission - that's okay,
+            # the deployment script should handle permissions
+            pass
+        
         return secret_file
 
     def read_secret(self, username: str, name: str) -> str | None:

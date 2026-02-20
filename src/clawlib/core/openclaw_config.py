@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from clawlib.models.config import DefaultsConfig, UserConfig
+from clawctl.models.config import DefaultsConfig, UserConfig
 
 
 def generate_openclaw_config(

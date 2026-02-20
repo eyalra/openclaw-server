@@ -11,8 +11,8 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 
-from clawctl.core.config import load_config_or_exit
-from clawctl.core.docker_manager import CONTAINER_PREFIX
+from clawlib.core.config import load_config_or_exit
+from clawlib.core.docker_manager import CONTAINER_PREFIX
 
 console = Console()
 
@@ -323,8 +323,8 @@ def gog_setup(
             raise typer.Exit(0)
 
     # Get secrets manager to pass keyring password to exec commands
-    from clawctl.core.secrets import SecretsManager
-    from clawctl.core.paths import Paths
+    from clawlib.core.secrets import SecretsManager
+    from clawlib.core.paths import Paths
     secrets_mgr = SecretsManager(Paths(cfg.clawctl.data_root, cfg.clawctl.build_root))
     
     success = run_gog_auth(name, user.skills.gog.email, client, services=services, readonly=readonly, secrets_mgr=secrets_mgr)
@@ -383,7 +383,7 @@ def gog_test(
         console.print(f"  Config file (clawctl.toml): [cyan]{config_email}[/cyan]")
         
         # Check what's in openclaw.json
-        from clawctl.core.paths import Paths
+        from clawlib.core.paths import Paths
         paths = Paths(cfg.clawctl.data_root, cfg.clawctl.build_root)
         openclaw_config_path = paths.user_openclaw_config(name)
         if openclaw_config_path.exists():
@@ -420,7 +420,7 @@ def gog_test(
         console.print("\n  Attempting to inspect credentials file...")
         try:
             # Try to read credentials.json from the host mount
-            from clawctl.core.paths import Paths
+            from clawlib.core.paths import Paths
             paths = Paths(cfg.clawctl.data_root, cfg.clawctl.build_root)
             config_dir = paths.user_config_dir(name)
             creds_file = config_dir / "gogcli" / "credentials.json"
@@ -499,8 +499,8 @@ def gog_test(
 
     # Test 1: Check if secrets are mounted
     console.print("1. Checking secrets...")
-    from clawctl.core.secrets import SecretsManager
-    from clawctl.core.paths import Paths
+    from clawlib.core.secrets import SecretsManager
+    from clawlib.core.paths import Paths
     secrets_mgr = SecretsManager(Paths(cfg.clawctl.data_root, cfg.clawctl.build_root))
     
     required_secrets = ["gog_client_id", "gog_client_secret", "gog_keyring_password"]
