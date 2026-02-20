@@ -33,9 +33,9 @@ def _get_tailscale_ip() -> str | None:
         return None
 
 
-def _get_docker_manager() -> DockerManager:
+def _get_docker_manager(config_path: Path | None = None) -> DockerManager:
     """Get DockerManager instance."""
-    config_path_resolved = find_config_path()
+    config_path_resolved = find_config_path(config_path)
     if not config_path_resolved:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -111,6 +111,23 @@ async def list_instances(
                     management_urls.append(f"http://{tailscale_ip}:{port}")
                 management_urls.append(f"http://localhost:{port}")
         
+        # Get model pricing if available
+        model_pricing = None
+        if user and user.agent.model:
+            # Try to get pricing from OpenRouter models cache
+            try:
+                from clawctl_web.endpoints.models import _get_cached_models
+                cached_models = _get_cached_models()
+                if cached_models:
+                    model_match = next(
+                        (m for m in cached_models if m.get("id") == user.agent.model),
+                        None
+                    )
+                    if model_match:
+                        model_pricing = model_match.get("pricing")
+            except Exception:
+                pass
+        
         result.append(
             {
                 "username": username,
@@ -118,6 +135,7 @@ async def list_instances(
                 "port": port,
                 "management_urls": management_urls,
                 "model": user.agent.model if user else None,
+                "model_pricing": model_pricing,
                 "in_config": True,
             }
         )

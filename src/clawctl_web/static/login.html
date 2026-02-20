@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - OpenClaw Management Interface</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f5f5f5;
+        }
+        .login-container {
+            background-color: #fff;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        .login-container h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #2c3e50;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+        .form-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        .error-message {
+            color: #e74c3c;
+            margin-top: 10px;
+            font-size: 14px;
+            display: none;
+        }
+        .btn-login {
+            width: 100%;
+            padding: 12px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .btn-login:hover {
+            background-color: #2980b9;
+        }
+        .btn-login:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h1>OpenClaw Management</h1>
+        <form id="login-form">
+            <div class="form-group">
+                <label for="username">Username:</label>
+                <input type="text" id="username" class="form-input" required autofocus>
+            </div>
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" class="form-input" required>
+            </div>
+            <div class="error-message" id="error-message"></div>
+            <button type="submit" class="btn-login" id="login-btn">Login</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById("login-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+            const errorDiv = document.getElementById("error-message");
+            const loginBtn = document.getElementById("login-btn");
+            
+            errorDiv.style.display = "none";
+            loginBtn.disabled = true;
+            loginBtn.textContent = "Logging in...";
+            
+            try {
+                // Test credentials by making an API call
+                const auth = btoa(`${username}:${password}`);
+                const response = await fetch("/api/system/config", {
+                    headers: {
+                        "Authorization": `Basic ${auth}`,
+                    },
+                });
+                
+                if (response.ok) {
+                    // Store credentials in sessionStorage
+                    sessionStorage.setItem("credentials", JSON.stringify({ username, password }));
+                    window.location.href = "/";
+                } else {
+                    throw new Error("Invalid username or password");
+                }
+            } catch (error) {
+                errorDiv.textContent = error.message || "Login failed. Please check your credentials.";
+                errorDiv.style.display = "block";
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = "Login";
+            }
+        });
+    </script>
+</body>
+</html>

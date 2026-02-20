@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenClaw Management Interface</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>OpenClaw Management Interface</h1>
+            <div class="header-actions">
+                <button id="refresh-models-btn" class="btn btn-secondary">Refresh Models</button>
+                <button id="logout-btn" class="btn btn-secondary">Logout</button>
+            </div>
+        </header>
+
+        <main>
+            <nav class="main-nav">
+                <button class="nav-btn active" data-page="dashboard">Dashboard</button>
+                <button class="nav-btn" data-page="system">System Config</button>
+            </nav>
+
+            <div id="dashboard-page" class="page active">
+                <section id="instances-section">
+                    <h2>Instances</h2>
+                    <div id="instances-container"></div>
+                </section>
+
+                <section id="users-section">
+                    <h2>Users</h2>
+                    <div id="users-container"></div>
+                </section>
+            </div>
+
+            <div id="system-page" class="page">
+                <section id="system-section">
+                    <h2>System Configuration</h2>
+                    <div id="system-container"></div>
+                </section>
+            </div>
+        </main>
+
+        <!-- Model Selection Modal -->
+        <div id="model-modal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>Select Model</h2>
+                <div class="form-group">
+                    <label for="provider-select">Provider:</label>
+                    <select id="provider-select" class="form-input">
+                        <option value="openrouter">OpenRouter</option>
+                        <option value="anthropic">Anthropic</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="model-select">Model:</label>
+                    <select id="model-select" class="form-input">
+                        <option value="">Loading...</option>
+                    </select>
+                    <div id="model-pricing" class="model-pricing"></div>
+                </div>
+                <div class="form-group">
+                    <button id="save-model-btn" class="btn btn-primary">Save</button>
+                    <button id="cancel-model-btn" class="btn btn-secondary">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs Modal -->
+        <div id="logs-modal" class="modal">
+            <div class="modal-content modal-large">
+                <span class="close">&times;</span>
+                <h2>Docker Logs: <span id="logs-username"></span></h2>
+                <div id="logs-container" class="logs-container"></div>
+                <div class="form-group">
+                    <button id="close-logs-btn" class="btn btn-secondary">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/dashboard.js"></script>
+</body>
+</html>

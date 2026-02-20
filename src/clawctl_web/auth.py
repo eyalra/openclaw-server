@@ -77,7 +77,7 @@ def get_current_user(
     config = load_config(config_path_resolved)
     from clawlib.models.config import WebConfig
     
-    web_config = config.web if config.web else WebConfig()
+    web_config = getattr(config, 'web', None) or WebConfig()
     expected_username = web_config.admin_username
 
     if credentials.username != expected_username:

@@ -9,7 +9,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from clawctl.models.config import Config
+from clawlib.models.config import Config
 
 # Config is searched relative to the current directory (project root).
 DEFAULT_CONFIG_PATHS = [

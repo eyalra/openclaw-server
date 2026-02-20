@@ -129,9 +129,43 @@ class ClawctlSettings(BaseModel):
     defaults: DefaultsConfig = DefaultsConfig()
 
 
+class ModelPriceLimits(BaseModel):
+    """Price limits for filtering models."""
+    max_prompt_price_per_million: float | None = Field(
+        default=None,
+        ge=0,
+        description="Maximum price per million prompt tokens (USD). Models exceeding this will be filtered out."
+    )
+    max_completion_price_per_million: float | None = Field(
+        default=None,
+        ge=0,
+        description="Maximum price per million completion tokens (USD). Models exceeding this will be filtered out."
+    )
+    max_request_price: float | None = Field(
+        default=None,
+        ge=0,
+        description="Maximum price per request (USD). Models exceeding this will be filtered out."
+    )
+
+
+class WebConfig(BaseModel):
+    """Web management interface configuration."""
+    enabled: bool = True
+    port: int = Field(default=9000, ge=1, le=65535)
+    host: str = "0.0.0.0"
+    admin_username: str = "admin"
+    model_price_limits: ModelPriceLimits | None = Field(
+        default=None,
+        description="Price limits for filtering available models"
+    )
+
+
 class Config(BaseModel):
     clawctl: ClawctlSettings
     users: list[UserConfig] = []
+    web: WebConfig | None = None  # Optional web interface config
+    
+    model_config = {"extra": "allow"}  # Allow extra fields for backward compatibility
 
     def get_user(self, name: str) -> UserConfig | None:
         """Get a user config by name."""

@@ -14,9 +14,9 @@ from clawlib.core.docker_manager import DockerManager
 router = APIRouter()
 
 
-def _get_docker_manager() -> DockerManager:
+def _get_docker_manager(config_path: Path | None = None) -> DockerManager:
     """Get DockerManager instance."""
-    config_path_resolved = find_config_path()
+    config_path_resolved = find_config_path(config_path)
     if not config_path_resolved:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
