@@ -142,7 +142,7 @@ class DockerManager:
             secrets_dir: {"bind": "/run/secrets", "mode": "ro"},
         }
 
-        # Add knowledge directory mount if configured and exists
+        # Add knowledge directory mount if configured and exists (backward compatibility)
         knowledge_dir = self.config.clawctl.knowledge_dir
         if knowledge_dir:
             knowledge_path = Path(knowledge_dir)
@@ -155,6 +155,13 @@ class DockerManager:
             if knowledge_path.exists() and knowledge_path.is_dir():
                 volumes[str(knowledge_path)] = {"bind": "/mnt/knowledge", "mode": "ro"}
             # If not exists, silently skip (knowledge dir is optional)
+
+        # Add shared collections mount if configured and exists
+        if self.config.clawctl.shared_collections:
+            shared_root = self.paths.shared_collections_root
+            if shared_root.exists() and shared_root.is_dir():
+                # Mount entire shared/ directory once, preserving nested structure
+                volumes[str(shared_root)] = {"bind": "/mnt/shared", "mode": "ro"}
 
         self.client.containers.create(
             image=self.image_tag,

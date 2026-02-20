@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class ChannelSlackConfig(BaseModel):
@@ -112,6 +113,51 @@ class BackupConfig(BaseModel):
     )
 
 
+class SharedCollectionsConfig(BaseModel):
+    """Configuration for shared document collections synced from S3 or local directory.
+    
+    Collections can be deeply nested (e.g., "newsletters/2024/january").
+    - For S3: Each collection syncs from s3://{bucket}/{prefix}{collection_name}/
+    - For local: Each collection syncs from {local_source_base}/{collection_name}/
+    to {data_root}/shared/{collection_name}/.
+    """
+    source_type: Literal["s3", "local"] = "s3"  # Source type: 's3' or 'local'
+    
+    # S3 configuration (required if source_type is "s3")
+    s3_bucket: str | None = None  # S3 bucket name
+    s3_prefix: str = ""  # Base prefix in bucket (e.g., "shared-docs/")
+    
+    # Local configuration (required if source_type is "local")
+    local_source_base: Path | None = None  # Base directory for local source collections
+    
+    collections: list[str] = Field(default_factory=list)  # List of collection names (folders)
+    sync_schedule: str = Field(default="daily", description="Schedule: 'daily', 'hourly', or cron expression")
+    
+    @field_validator("collections")
+    @classmethod
+    def validate_collections(cls, v: list[str]) -> list[str]:
+        """Validate collection paths to prevent directory traversal."""
+        for collection in v:
+            # Normalize path and check for directory traversal attempts
+            normalized = Path(collection).as_posix()
+            if normalized.startswith("/") or normalized.startswith(".."):
+                raise ValueError(f"Invalid collection path: {collection} (cannot start with / or ..)")
+            if "//" in normalized:
+                raise ValueError(f"Invalid collection path: {collection} (cannot contain //)")
+        return v
+    
+    @model_validator(mode="after")
+    def validate_source_config(self) -> "SharedCollectionsConfig":
+        """Validate that source-specific configuration is provided."""
+        if self.source_type == "s3":
+            if not self.s3_bucket:
+                raise ValueError("s3_bucket is required when source_type is 's3'")
+        elif self.source_type == "local":
+            if not self.local_source_base:
+                raise ValueError("local_source_base is required when source_type is 'local'")
+        return self
+
+
 class DefaultsConfig(BaseModel):
     model: str = "openrouter/z-ai/glm-4.5-air:free"
     skills: SkillsConfig = SkillsConfig()
@@ -124,9 +170,10 @@ class ClawctlSettings(BaseModel):
     openclaw_version: str = "latest"
     image_name: str = "openclaw-instance"
     log_level: str = Field(default="info", pattern=r"^(debug|info|warning|error)$")
-    knowledge_dir: Path | None = None  # Optional shared knowledge directory (read-only mount)
+    knowledge_dir: Path | None = None  # Optional shared knowledge directory (read-only mount) - deprecated, use shared_collections
     backup: BackupConfig = BackupConfig()
     defaults: DefaultsConfig = DefaultsConfig()
+    shared_collections: SharedCollectionsConfig | None = None  # S3-synced shared document collections
 
 
 class ModelPriceLimits(BaseModel):

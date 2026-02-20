@@ -46,6 +46,26 @@ class Paths:
     def users_root(self) -> Path:
         return self.data_root / "users"
 
+    @property
+    def shared_collections_root(self) -> Path:
+        """Root directory for shared document collections."""
+        return self.data_root / "shared"
+
+    def shared_collection_dir(self, name: str) -> Path:
+        """Get the directory path for a shared collection.
+        
+        Args:
+            name: Collection name (can be nested, e.g., "newsletters/2024/january")
+            
+        Returns:
+            Path to the collection directory
+        """
+        # Normalize the path to prevent directory traversal
+        normalized = Path(name).as_posix()
+        if normalized.startswith("/") or normalized.startswith(".."):
+            raise ValueError(f"Invalid collection name: {name}")
+        return self.shared_collections_root / normalized
+
     # --- Per-user ---
 
     def user_dir(self, username: str) -> Path:
@@ -92,3 +112,4 @@ class Paths:
         self.data_root.mkdir(parents=True, exist_ok=True)
         self.secrets_root.mkdir(parents=True, exist_ok=True)
         self.users_root.mkdir(parents=True, exist_ok=True)
+        self.shared_collections_root.mkdir(parents=True, exist_ok=True)

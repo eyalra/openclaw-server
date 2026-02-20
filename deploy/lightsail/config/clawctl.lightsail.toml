@@ -19,9 +19,36 @@ image_name = "openclaw-instance"
 # Log level for clawctl (debug, info, warning, error)
 log_level = "info"
 
-# Shared knowledge directory (read-only mount for all containers)
+# Shared knowledge directory (read-only mount for all containers) - DEPRECATED
 # Mounted at /mnt/knowledge inside containers
+# Use [clawctl.shared_collections] instead for S3-synced collections
 knowledge_dir = "/home/openclaw/data/knowledge"
+
+# Shared document collections synced from S3 or local directory (optional)
+# Collections are mounted read-only at /mnt/shared/{collection_name}/ in containers
+# 
+# Example: S3 source
+# [clawctl.shared_collections]
+# source_type = "s3"
+# s3_bucket = "company-shared-docs"
+# s3_prefix = "shared/"
+# collections = [
+#     "newsletters",
+#     "newsletters/2024",
+#     "newsletters/2024/january",
+#     "company-docs"
+# ]
+# sync_schedule = "daily"  # "daily", "hourly", or "HH:MM" format
+#
+# Example: Local directory source
+# [clawctl.shared_collections]
+# source_type = "local"
+# local_source_base = "/home/openclaw/shared-source"  # Base directory containing collection folders
+# collections = [
+#     "newsletters",
+#     "company-docs"
+# ]
+# sync_schedule = "daily"
 
 [clawctl.backup]
 # Enable periodic git-based backup of user memory/workspace files

@@ -100,15 +100,16 @@ echo "Step 1: Creating directory structure..."
 CURRENT_USER=\$(whoami 2>/dev/null || echo "\$USER")
 if [ "\$CURRENT_USER" != "openclaw" ]; then
     # If running as ubuntu or root, use sudo
-    sudo mkdir -p $REMOTE_HOME/data/{secrets,users,knowledge/{transcripts,newsletters,emails}}
+    sudo mkdir -p $REMOTE_HOME/data/{secrets,users,shared,knowledge/{transcripts,newsletters,emails}}
     sudo mkdir -p $REMOTE_HOME/build/logs
     sudo chown -R openclaw:openclaw $REMOTE_HOME
 else
     # If already running as openclaw, create directly
-    mkdir -p $REMOTE_HOME/data/{secrets,users,knowledge/{transcripts,newsletters,emails}}
+    mkdir -p $REMOTE_HOME/data/{secrets,users,shared,knowledge/{transcripts,newsletters,emails}}
     mkdir -p $REMOTE_HOME/build/logs
 fi
 echo "  Directory structure created"
+echo "  Note: Shared collections will be synced to $REMOTE_HOME/data/shared/"
 
 echo ""
 echo "Step 2: Cloning OpenClaw repository..."
@@ -185,10 +186,12 @@ else
 fi
 
 echo ""
-echo "Step 5: Setting up knowledge directory permissions..."
+echo "Step 5: Setting up knowledge and shared directories permissions..."
 sudo chown -R openclaw:openclaw $REMOTE_HOME/data/knowledge
 chmod -R 755 $REMOTE_HOME/data/knowledge
-echo "  Knowledge directory permissions set"
+sudo chown -R openclaw:openclaw $REMOTE_HOME/data/shared
+chmod -R 755 $REMOTE_HOME/data/shared
+echo "  Knowledge and shared directories permissions set"
 
 echo ""
 echo "Step 6: Creating initial clawctl.toml (if needed)..."
