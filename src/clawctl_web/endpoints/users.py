@@ -281,6 +281,17 @@ async def update_user_model(
         if docker_mgr.container_exists(username):
             docker_mgr.restart_container(username)
             
+            # Run openclaw doctor --fix to ensure full authentication
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Running openclaw doctor --fix for {username} after model update")
+            doctor_success = docker_mgr.run_doctor_fix(username)
+            if not doctor_success:
+                logger.warning(
+                    f"openclaw doctor --fix failed for {username} after model update. "
+                    "Gateway authentication may not be fully configured."
+                )
+            
             # Configure agent auth to ensure correct provider is used
             _configure_agent_auth(docker_mgr, username, request.model, secrets_mgr)
         

@@ -19,18 +19,24 @@ app = typer.Typer(
 user_app = typer.Typer(help="Manage users", no_args_is_help=True)
 backup_app = typer.Typer(help="Manage backups", no_args_is_help=True)
 backup_schedule_app = typer.Typer(help="Manage backup scheduling", no_args_is_help=True)
+maintenance_app = typer.Typer(help="Manage nightly maintenance (backup + restart)", no_args_is_help=True)
+maintenance_schedule_app = typer.Typer(help="Manage maintenance scheduling", no_args_is_help=True)
 shared_collections_app = typer.Typer(help="Manage shared document collections", no_args_is_help=True)
 shared_collections_schedule_app = typer.Typer(help="Manage shared collections sync scheduling", no_args_is_help=True)
 config_app = typer.Typer(help="Configuration utilities", no_args_is_help=True)
 gog_app = typer.Typer(help="Manage gog Google Workspace integration", no_args_is_help=True)
+web_app = typer.Typer(help="Web management interface", no_args_is_help=True)
 
 app.add_typer(user_app, name="user")
 app.add_typer(backup_app, name="backup")
 backup_app.add_typer(backup_schedule_app, name="schedule")
+app.add_typer(maintenance_app, name="maintenance")
+maintenance_app.add_typer(maintenance_schedule_app, name="schedule")
 app.add_typer(shared_collections_app, name="shared-collections")
 shared_collections_app.add_typer(shared_collections_schedule_app, name="schedule")
 app.add_typer(config_app, name="config")
 app.add_typer(gog_app, name="gog")
+app.add_typer(web_app, name="web")
 
 # Global option for config file path
 ConfigOption = Annotated[
@@ -57,7 +63,7 @@ def main(
 
 # Import and register commands
 from clawctl.commands.init import init  # noqa: E402
-from clawctl.commands.user import user_add, user_list, user_remove, user_set_slack  # noqa: E402
+from clawctl.commands.user import user_add, user_list, user_remove, user_set_slack, user_set_discord  # noqa: E402
 from clawctl.commands.lifecycle import start, stop, restart, start_all, stop_all  # noqa: E402
 from clawctl.commands.status import status  # noqa: E402
 from clawctl.commands.logs import logs  # noqa: E402
@@ -69,10 +75,12 @@ from clawctl.commands.shared_collections import (  # noqa: E402
     schedule_stop as sc_schedule_stop,
     sync,
 )
+from clawctl.commands.maintenance import maintenance_run, schedule_start as maintenance_schedule_start, schedule_stop as maintenance_schedule_stop, schedule_status as maintenance_schedule_status  # noqa: E402
 from clawctl.commands.config_cmd import validate, regenerate  # noqa: E402
 from clawctl.commands.update import update  # noqa: E402
 from clawctl.commands.clean import clean  # noqa: E402
 from clawctl.commands.gog import gog_setup, gog_test  # noqa: E402
+from clawctl.commands.web import web_start, web_set_password  # noqa: E402
 
 # Register top-level commands
 app.command()(init)
@@ -86,16 +94,26 @@ app.command()(logs)
 app.command()(update)
 app.command()(clean)
 
+# Web commands
+web_app.command(name="start")(web_start)
+web_app.command(name="set-password")(web_set_password)
+
 # Register sub-commands
 user_app.command(name="add")(user_add)
 user_app.command(name="remove")(user_remove)
 user_app.command(name="list")(user_list)
 user_app.command(name="set-slack")(user_set_slack)
+user_app.command(name="set-discord")(user_set_discord)
 
 backup_app.command(name="run")(backup_run)
 backup_schedule_app.command(name="start")(schedule_start)
 backup_schedule_app.command(name="stop")(schedule_stop)
 backup_schedule_app.command(name="status")(schedule_status)
+
+maintenance_app.command(name="run")(maintenance_run)
+maintenance_schedule_app.command(name="start")(maintenance_schedule_start)
+maintenance_schedule_app.command(name="stop")(maintenance_schedule_stop)
+maintenance_schedule_app.command(name="status")(maintenance_schedule_status)
 
 shared_collections_app.command(name="sync")(sync)
 shared_collections_app.command(name="list")(list_collections)

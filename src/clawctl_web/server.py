@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
 from pathlib import Path
@@ -9,6 +10,12 @@ from pathlib import Path
 import uvicorn
 
 from clawctl_web.api import create_app
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG if os.environ.get("WEB_DEBUG", "false").lower() == "true" else logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
 
 if __name__ == "__main__":
     # Allow config path to be specified via environment variable

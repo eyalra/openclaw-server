@@ -10,8 +10,8 @@ from typing import Iterator
 import docker
 import docker.errors
 
-from clawctl.core.paths import Paths
-from clawctl.models.config import Config, UserConfig
+from clawlib.core.paths import Paths
+from clawlib.models.config import Config, UserConfig
 
 CONTAINER_PREFIX = "openclaw"
 NETWORK_PREFIX = "openclaw-net"
@@ -160,6 +160,11 @@ class DockerManager:
             str(secrets_dir): {"bind": "/run/secrets", "mode": "ro"},
         }
 
+        # Mount Tailscale socket if available (for Tailscale Serve mode)
+        tailscale_socket = Path("/var/run/tailscale/tailscaled.sock")
+        if tailscale_socket.exists() and tailscale_socket.is_socket():
+            volumes["/var/run/tailscale"] = {"bind": "/var/run/tailscale", "mode": "ro"}
+
         # Add knowledge directory mount if configured and exists
         knowledge_dir = self.config.clawctl.knowledge_dir
         if knowledge_dir:
@@ -180,8 +185,15 @@ class DockerManager:
             user="1000:1000",
             network=_network_name(user.name),
             volumes=volumes,
-            ports={"18789/tcp": None},  # random host port
+            ports={"18789/tcp": user.port or None},  # fixed port if configured, else random
             restart_policy={"Name": "unless-stopped"},
+            healthcheck={
+                "Test": ["CMD-SHELL", "curl -so /dev/null http://127.0.0.1:18789/ || exit 1"],
+                "Interval": 30_000_000_000,
+                "Timeout": 10_000_000_000,
+                "StartPeriod": 15_000_000_000,
+                "Retries": 3,
+            },
             detach=True,
         )
 
@@ -189,6 +201,77 @@ class DockerManager:
         """Start a user's container."""
         container = self.client.containers.get(_container_name(username))
         container.start()
+
+    def run_doctor_fix(self, username: str, *, wait_ready: bool = True, timeout: int = 60) -> bool:
+        """Run `openclaw doctor --fix` inside a container to ensure full authentication.
+        
+        This ensures the gateway URL is properly authenticated and Discord/other plugins
+        are enabled. This is the recommended OpenClaw mechanism for ensuring full
+        authentication after container startup/restart.
+        
+        Args:
+            username: The username whose container to run doctor in.
+            wait_ready: If True, wait for container to be running before executing.
+            timeout: Maximum seconds to wait for container to be ready and doctor to complete.
+            
+        Returns:
+            True if doctor ran successfully, False otherwise.
+        """
+        import time
+        
+        container_name = _container_name(username)
+        try:
+            container = self.client.containers.get(container_name)
+            logger.info(f"Running openclaw doctor --fix for {username}...")
+            
+            # Wait for container to be running if requested
+            if wait_ready:
+                start_time = time.time()
+                logger.debug(f"Waiting for container {container_name} to be running...")
+                while container.status != "running":
+                    if time.time() - start_time > timeout:
+                        logger.error(f"Timeout waiting for container {container_name} to be running")
+                        return False
+                    time.sleep(1)
+                    container.reload()
+                
+                logger.debug(f"Container {container_name} is running, waiting 3s for gateway to start...")
+                # Give gateway a moment to start up
+                time.sleep(3)
+            
+            # Run openclaw doctor --fix
+            # Use user 1000:1000 to match container user
+            logger.debug(f"Executing 'openclaw doctor --fix' in container {container_name}")
+            exec_result = container.exec_run(
+                "openclaw doctor --fix",
+                user="1000:1000",
+                workdir="/home/node",
+            )
+            
+            if exec_result.exit_code == 0:
+                output = exec_result.output.decode("utf-8", errors="replace") if exec_result.output else ""
+                logger.info(f"Successfully ran openclaw doctor --fix for {username}")
+                if output:
+                    logger.debug(f"Doctor output: {output[:500]}")  # Log first 500 chars
+                return True
+            else:
+                output = exec_result.output.decode("utf-8", errors="replace") if exec_result.output else ""
+                logger.error(
+                    f"openclaw doctor --fix failed for {username} (exit code {exec_result.exit_code})"
+                )
+                if output:
+                    logger.error(f"Doctor error output: {output[:1000]}")  # Log first 1000 chars
+                return False
+            
+        except docker.errors.NotFound:
+            logger.error(f"Container {container_name} not found when trying to run doctor --fix")
+            return False
+        except docker.errors.APIError as e:
+            logger.error(f"Docker API error running doctor --fix for {username}: {e}")
+            return False
+        except Exception as e:
+            logger.exception(f"Unexpected error running doctor --fix for {username}: {e}")
+            return False
 
     def stop_container(self, username: str) -> None:
         """Stop a user's container."""

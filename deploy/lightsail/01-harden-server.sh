@@ -9,6 +9,13 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/scripts/load-config.sh"
 
+# Use initial SSH settings for connection (before hardening)
+INITIAL_SSH_USER="${INITIAL_SSH_USER:-ubuntu}"
+INITIAL_SSH_PORT="${INITIAL_SSH_PORT:-22}"
+# Final SSH settings (after hardening)
+FINAL_SSH_USER="${SSH_USER:-openclaw}"
+FINAL_SSH_PORT="${SSH_PORT:-2222}"
+
 echo "=========================================="
 echo "OpenClaw Server Hardening"
 echo "=========================================="
@@ -19,7 +26,7 @@ echo "  2. Create non-root user 'openclaw'"
 echo "  3. Configure SSH (port 2222, key-only)"
 echo "  4. Configure UFW firewall"
 echo ""
-echo "Target server: $SSH_USER@$LIGHTSAIL_IP:$SSH_PORT"
+echo "Target server: $INITIAL_SSH_USER@$LIGHTSAIL_IP:$INITIAL_SSH_PORT"
 echo ""
 
 # Confirm before proceeding
@@ -33,7 +40,7 @@ echo ""
 echo "Connecting to server..."
 
 # Execute hardening steps on remote server
-ssh -p "$SSH_PORT" -i "$SSH_KEY" "$SSH_USER@$LIGHTSAIL_IP" << 'REMOTE_SCRIPT'
+ssh -p "$INITIAL_SSH_PORT" -i "$SSH_KEY" "$INITIAL_SSH_USER@$LIGHTSAIL_IP" << 'REMOTE_SCRIPT'
 set -e
 
 echo "Step 1: Updating system packages..."
@@ -204,8 +211,30 @@ echo ""
 echo "If connection works:"
 echo "  1. Remove port 22 from Lightsail firewall (Lightsail Console → Networking)"
 echo "  2. Remove port 22 from UFW: sudo ufw delete allow 22/tcp"
-echo "  3. Update .lightsail-config: SSH_PORT=\"2222\" and SSH_USER=\"openclaw\""
 REMOTE_SCRIPT
+
+# Update .lightsail-config with hardened values
+CONFIG_FILE="$SCRIPT_DIR/.lightsail-config"
+if [ -f "$CONFIG_FILE" ]; then
+    echo ""
+    echo "Updating .lightsail-config with hardened SSH settings..."
+    # Update SSH_USER
+    if grep -q "^SSH_USER=" "$CONFIG_FILE"; then
+        sed -i.bak "s|^SSH_USER=.*|SSH_USER="$FINAL_SSH_USER"|" "$CONFIG_FILE"
+    else
+        echo "SSH_USER="$FINAL_SSH_USER"" >> "$CONFIG_FILE"
+    fi
+    # Update SSH_PORT
+    if grep -q "^SSH_PORT=" "$CONFIG_FILE"; then
+        sed -i.bak "s|^SSH_PORT=.*|SSH_PORT="$FINAL_SSH_PORT"|" "$CONFIG_FILE"
+    else
+        echo "SSH_PORT="$FINAL_SSH_PORT"" >> "$CONFIG_FILE"
+    fi
+    echo "  ✓ Updated SSH_USER=$FINAL_SSH_USER"
+    echo "  ✓ Updated SSH_PORT=$FINAL_SSH_PORT"
+else
+    echo "  ⚠ .lightsail-config not found, skipping auto-update"
+fi
 
 echo ""
 echo "=========================================="
@@ -216,10 +245,5 @@ echo "NEXT STEPS:"
 echo "  1. Test SSH connection on port 2222:"
 echo "     ssh -p 2222 -i $SSH_KEY openclaw@$LIGHTSAIL_IP"
 echo ""
-echo "  2. If successful, update .lightsail-config:"
-echo "     SSH_PORT=\"2222\""
-echo "     SSH_USER=\"openclaw\""
-echo ""
-echo "  3. Remove port 22 from Lightsail firewall (Lightsail Console)"
-echo ""
-echo "  4. Then run: 02-install-dependencies.sh"
+
+

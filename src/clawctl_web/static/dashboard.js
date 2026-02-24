@@ -353,9 +353,11 @@ async function loadInstances() {
                     </div>
                     ${instance.management_urls && instance.management_urls.length > 0 ? `
                     <div class="instance-info-item">
-                        <strong>Management URLs:</strong>
+                        <strong>Gateway:</strong>
                         <ul>
-                            ${instance.management_urls.map(url => `<li><a href="${url}" target="_blank" class="url-link">${url}</a></li>`).join("")}
+                            ${instance.management_urls.map(url => {
+                                return `<li><a href="${url}" target="_blank" style="color: #28a745; font-weight: bold;">${url.split('?')[0]}</a></li>`;
+                            }).join("")}
                         </ul>
                     </div>
                     ` : ""}
@@ -658,6 +660,7 @@ document.addEventListener("DOMContentLoaded", () => {
             
             if (page === "system") {
                 loadSystemConfig();
+                fetchMaintenanceStatus();
             }
         });
     });
@@ -775,6 +778,113 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
 
+// --- Maintenance panel ---
+
+async function fetchMaintenanceStatus() {
+    try {
+        const data = await apiCall("/maintenance/status");
+        renderMaintenancePanel(data);
+    } catch (error) {
+        const msg = document.getElementById("maintenance-message");
+        if (msg) {
+            msg.style.display = "block";
+            msg.className = "maintenance-message error";
+            msg.textContent = `Error loading maintenance status: ${error.message}`;
+        }
+    }
+}
+
+function renderMaintenancePanel(data) {
+    const badge = document.getElementById("maintenance-status-badge");
+    const scheduledTime = document.getElementById("maintenance-scheduled-time");
+    const lastRun = document.getElementById("maintenance-last-run");
+    const nextRun = document.getElementById("maintenance-next-run");
+    const startBtn = document.getElementById("maintenance-start-btn");
+    const stopBtn = document.getElementById("maintenance-stop-btn");
+
+    if (!badge) return;
+
+    if (data.running) {
+        badge.className = "badge badge-running";
+        badge.textContent = `Running (PID ${data.pid || "?"})`;
+        if (startBtn) startBtn.disabled = true;
+        if (stopBtn) stopBtn.disabled = false;
+    } else {
+        badge.className = "badge badge-stopped";
+        badge.textContent = "Stopped";
+        if (startBtn) startBtn.disabled = false;
+        if (stopBtn) stopBtn.disabled = true;
+    }
+
+    if (scheduledTime) {
+        scheduledTime.textContent = data.scheduled_time
+            ? `${data.scheduled_time} UTC daily`
+            : "—";
+    }
+
+    if (lastRun) {
+        lastRun.textContent = data.last_run
+            ? new Date(data.last_run).toLocaleString()
+            : "Never";
+    }
+
+    if (nextRun) {
+        nextRun.textContent = data.next_run
+            ? new Date(data.next_run).toLocaleString()
+            : data.running ? "Calculating..." : "—";
+    }
+
+    // Update Run Now button state
+    const runBtn = document.getElementById("maintenance-run-btn");
+    if (runBtn) {
+        runBtn.disabled = data.cycle_running;
+        runBtn.textContent = data.cycle_running ? "Running..." : "Run Now";
+    }
+}
+
+function showMaintenanceMessage(text, isError = false) {
+    const msg = document.getElementById("maintenance-message");
+    if (!msg) return;
+    msg.style.display = "block";
+    msg.className = `maintenance-message ${isError ? "error" : "success"}`;
+    msg.textContent = text;
+    setTimeout(() => { msg.style.display = "none"; }, 5000);
+}
+
+async function runMaintenanceNow() {
+    const btn = document.getElementById("maintenance-run-btn");
+    if (btn) { btn.disabled = true; btn.textContent = "Running..."; }
+    try {
+        await apiCall("/maintenance/run", { method: "POST" });
+        showMaintenanceMessage("Maintenance cycle started in background (backup → restart). This may take a minute.");
+        // Poll for completion
+        setTimeout(fetchMaintenanceStatus, 3000);
+    } catch (error) {
+        showMaintenanceMessage(`Failed to start maintenance: ${error.message}`, true);
+        if (btn) { btn.disabled = false; btn.textContent = "Run Now"; }
+    }
+}
+
+async function startMaintenanceSchedule() {
+    try {
+        const data = await apiCall("/maintenance/schedule/start", { method: "POST" });
+        showMaintenanceMessage(data.message);
+        fetchMaintenanceStatus();
+    } catch (error) {
+        showMaintenanceMessage(`Failed to start schedule: ${error.message}`, true);
+    }
+}
+
+async function stopMaintenanceSchedule() {
+    try {
+        const data = await apiCall("/maintenance/schedule/stop", { method: "POST" });
+        showMaintenanceMessage(data.message);
+        fetchMaintenanceStatus();
+    } catch (error) {
+        showMaintenanceMessage(`Failed to stop schedule: ${error.message}`, true);
+    }
+}
+
 // Make functions available globally
 window.showModelModal = showModelModal;
 window.viewLogs = viewLogs;
@@ -783,3 +893,6 @@ window.startInstance = startInstance;
 window.stopInstance = stopInstance;
 window.restartInstance = restartInstance;
 window.logout = logout;
+window.runMaintenanceNow = runMaintenanceNow;
+window.startMaintenanceSchedule = startMaintenanceSchedule;
+window.stopMaintenanceSchedule = stopMaintenanceSchedule;

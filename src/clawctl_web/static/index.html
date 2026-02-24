@@ -39,6 +39,36 @@
                     <h2>System Configuration</h2>
                     <div id="system-container"></div>
                 </section>
+
+                <section id="maintenance-section">
+                    <h2>Nightly Maintenance</h2>
+                    <div id="maintenance-container">
+                        <div class="card">
+                            <div class="card-row">
+                                <span class="card-label">Schedule</span>
+                                <span id="maintenance-status-badge" class="badge badge-unknown">Loading...</span>
+                            </div>
+                            <div class="card-row">
+                                <span class="card-label">Scheduled time</span>
+                                <span id="maintenance-scheduled-time" class="card-value">—</span>
+                            </div>
+                            <div class="card-row">
+                                <span class="card-label">Last run</span>
+                                <span id="maintenance-last-run" class="card-value">—</span>
+                            </div>
+                            <div class="card-row">
+                                <span class="card-label">Next run</span>
+                                <span id="maintenance-next-run" class="card-value">—</span>
+                            </div>
+                            <div class="card-actions">
+                                <button id="maintenance-run-btn" class="btn btn-primary" onclick="runMaintenanceNow()">Run Now</button>
+                                <button id="maintenance-start-btn" class="btn btn-secondary" onclick="startMaintenanceSchedule()">Start Schedule</button>
+                                <button id="maintenance-stop-btn" class="btn btn-secondary" onclick="stopMaintenanceSchedule()">Stop Schedule</button>
+                            </div>
+                            <div id="maintenance-message" class="maintenance-message" style="display:none;"></div>
+                        </div>
+                    </div>
+                </section>
             </div>
         </main>
 

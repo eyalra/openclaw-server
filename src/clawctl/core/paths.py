@@ -36,6 +36,14 @@ class Paths:
     def backup_pid_file(self) -> Path:
         return self.build_root / ".backup.pid"
 
+    @property
+    def maintenance_pid_file(self) -> Path:
+        return self.build_root / ".maintenance.pid"
+
+    @property
+    def maintenance_last_run_file(self) -> Path:
+        return self.build_root / ".maintenance-last-run"
+
     # --- Data root (persistent user state) ---
 
     @property

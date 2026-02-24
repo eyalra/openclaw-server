@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import secrets
 import shutil
@@ -14,6 +15,8 @@ from clawctl.core.openclaw_config import write_openclaw_config
 from clawctl.core.paths import Paths
 from clawctl.core.secrets import SecretsManager
 from clawctl.models.config import Config, DefaultsConfig, UserConfig
+
+logger = logging.getLogger(__name__)
 
 GATEWAY_TOKEN_SECRET_NAME = "openclaw_gateway_token"
 
@@ -119,11 +122,17 @@ class UserManager:
         gateway_token = self.secrets.read_secret(user.name, GATEWAY_TOKEN_SECRET_NAME)
 
         # 5. Generate openclaw.json (includes gateway token for Docker NAT auth)
+        # Determine base_path for reverse proxy setups
+        from clawlib.core.openclaw_config import _is_tailscale_available
+        use_tailscale_serve = _is_tailscale_available()
+        base_path = None if use_tailscale_serve else f"/gateway/{user.name}"
+        
         write_openclaw_config(
             user,
             self.config.clawctl.defaults,
             self.paths.user_openclaw_config(user.name),
             gateway_token=gateway_token,
+            base_path=base_path,
         )
 
         # 6. Create and start container
@@ -131,6 +140,109 @@ class UserManager:
             self.docker.build_image()
         self.docker.create_container(user)
         self.docker.start_container(user.name)
+        
+        # 7. Run openclaw doctor --fix to ensure full authentication
+        # This ensures gateway URL is properly authenticated and Discord/plugins are enabled
+        logger.info(f"Running openclaw doctor --fix for newly provisioned user {user.name}")
+        doctor_success = self.docker.run_doctor_fix(user.name)
+        if not doctor_success:
+            logger.warning(
+                f"openclaw doctor --fix failed for {user.name}. "
+                "Gateway authentication may not be fully configured. "
+                "Check container logs for details."
+            )
+
+    def restart_user(self, username: str) -> None:
+        """Restart a user's container.
+        
+        Regenerates openclaw.json with gateway token authentication before restarting
+        to ensure full authentication is set up for gateway URLs and Discord integration.
+        """
+        user = self.config.get_user(username)
+        if user is None:
+            raise ValueError(f"User '{username}' not found in config")
+
+        # Ensure gateway token exists (generate if missing)
+        if not self.secrets.secret_exists(username, GATEWAY_TOKEN_SECRET_NAME):
+            token = secrets.token_urlsafe(32)
+            self.secrets.write_secret(username, GATEWAY_TOKEN_SECRET_NAME, token)
+
+        # Read gateway token
+        gateway_token = self.secrets.read_secret(username, GATEWAY_TOKEN_SECRET_NAME)
+
+        # Regenerate openclaw.json with gateway token (ensures auth is configured)
+        # Determine base_path for reverse proxy setups
+        from clawlib.core.openclaw_config import _is_tailscale_available
+        use_tailscale_serve = _is_tailscale_available()
+        base_path = None if use_tailscale_serve else f"/gateway/{username}"
+        
+        write_openclaw_config(
+            user,
+            self.config.clawctl.defaults,
+            self.paths.user_openclaw_config(username),
+            gateway_token=gateway_token,
+            base_path=base_path,
+        )
+
+        # Restart container
+        self.docker.restart_container(username)
+        
+        # Run openclaw doctor --fix to ensure full authentication
+        # This ensures gateway URL is properly authenticated and Discord/plugins are enabled
+        self.docker.run_doctor_fix(username)
+
+    def restart_all(self) -> list[str]:
+        """Restart all user containers.
+
+        Regenerates openclaw.json with gateway token authentication for each user
+        before restarting to ensure full authentication is set up.
+
+        Returns list of restarted usernames.
+        """
+        restarted = []
+        for user in self.config.users:
+            if self.docker.container_exists(user.name):
+                try:
+                    # Ensure gateway token exists (generate if missing)
+                    if not self.secrets.secret_exists(user.name, GATEWAY_TOKEN_SECRET_NAME):
+                        token = secrets.token_urlsafe(32)
+                        self.secrets.write_secret(user.name, GATEWAY_TOKEN_SECRET_NAME, token)
+
+                    # Read gateway token
+                    gateway_token = self.secrets.read_secret(user.name, GATEWAY_TOKEN_SECRET_NAME)
+
+                    # Regenerate openclaw.json with gateway token (ensures auth is configured)
+                    # Determine base_path for reverse proxy setups
+                    from clawlib.core.openclaw_config import _is_tailscale_available
+                    use_tailscale_serve = _is_tailscale_available()
+                    base_path = None if use_tailscale_serve else f"/gateway/{user.name}"
+                    
+                    write_openclaw_config(
+                        user,
+                        self.config.clawctl.defaults,
+                        self.paths.user_openclaw_config(user.name),
+                        gateway_token=gateway_token,
+                        base_path=base_path,
+                    )
+
+                    # Restart container
+                    self.docker.restart_container(user.name)
+                    
+                    # Run openclaw doctor --fix to ensure full authentication
+                    # This ensures gateway URL is properly authenticated and Discord/plugins are enabled
+                    logger.info(f"Running openclaw doctor --fix for restarted user {user.name}")
+                    doctor_success = self.docker.run_doctor_fix(user.name)
+                    if not doctor_success:
+                        logger.warning(
+                            f"openclaw doctor --fix failed for {user.name}. "
+                            "Gateway authentication may not be fully configured. "
+                            "Check container logs for details."
+                        )
+                    
+                    restarted.append(user.name)
+                except Exception:
+                    pass
+        return restarted
 
     def remove_user(self, username: str, *, keep_data: bool = True) -> None:
         """Remove a user's container and network, optionally removing data.

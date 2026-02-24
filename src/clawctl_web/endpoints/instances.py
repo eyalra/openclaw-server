@@ -12,7 +12,8 @@ from clawlib.core.config import find_config_path, load_config
 from clawlib.core.docker_manager import DockerManager
 from clawlib.core.paths import Paths
 from clawlib.core.secrets import SecretsManager
-from clawlib.core.user_manager import GATEWAY_TOKEN_SECRET_NAME
+from clawlib.core.user_manager import GATEWAY_TOKEN_SECRET_NAME, UserManager
+import json
 
 router = APIRouter()
 
@@ -31,6 +32,41 @@ def _get_tailscale_ip() -> str | None:
         return ip if ip else None
     except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
         return None
+
+
+def _get_tailscale_hostname() -> str | None:
+    """Get Tailscale MagicDNS hostname if available."""
+    try:
+        result = subprocess.run(
+            ["tailscale", "status", "--json"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=2,
+        )
+        status_data = json.loads(result.stdout)
+        self_info = status_data.get("Self", {})
+        dns_name = self_info.get("DNSName", "")
+        # Remove trailing dot if present (DNS FQDN format, but breaks URLs)
+        if dns_name:
+            dns_name = dns_name.rstrip(".")
+        return dns_name if dns_name else None
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired, json.JSONDecodeError):
+        return None
+
+
+def _is_tailscale_serve_enabled(username: str, paths: Paths) -> bool:
+    """Check if Tailscale Serve is enabled for a user by reading their openclaw.json."""
+    try:
+        config_path = paths.user_openclaw_config(username)
+        if not config_path.exists():
+            return False
+        config_data = json.loads(config_path.read_text())
+        gateway = config_data.get("gateway", {})
+        tailscale_config = gateway.get("tailscale", {})
+        return tailscale_config.get("mode") == "serve"
+    except Exception:
+        return False
 
 
 def _get_docker_manager(config_path: Path | None = None) -> DockerManager:
@@ -102,11 +138,36 @@ async def list_instances(
             if not gateway_token:
                 gateway_token = secrets_mgr.read_secret(username, "gateway_token")
             
+            # Check if Tailscale Serve is enabled in config
+            # Note: Even if enabled, gateways bind to loopback inside containers and need
+            # Tailscale Serve configured INSIDE the container (not on host). Since Tailscale
+            # isn't installed in containers, we use Docker port mapping instead.
+            tailscale_serve_enabled = _is_tailscale_serve_enabled(username, paths)
+            
+            # basePath is always set for reverse-proxy setups (/gateway/{username})
+            # We compute it directly instead of reading from the container config
+            # (which may have restrictive permissions from the gateway process)
+            base_path = f"/gateway/{username}"
+            
             if gateway_token:
-                if tailscale_ip:
-                    management_urls.append(f"http://{tailscale_ip}:{port}?token={gateway_token}")
-                management_urls.append(f"http://localhost:{port}?token={gateway_token}")
+                from urllib.parse import urlencode
+                
+                # If basePath is configured, generate reverse proxy URLs
+                # The gatewayUrl param tells the control UI where to open the WebSocket
+                if base_path:
+                    tailscale_hostname = _get_tailscale_hostname()
+                    if tailscale_hostname and tailscale_ip:
+                        ws_url = f"wss://{tailscale_hostname}/gateway/{username}"
+                        qs = urlencode({"token": gateway_token, "gatewayUrl": ws_url})
+                        management_urls.append(f"https://{tailscale_hostname}/gateway/{username}/?{qs}")
+                    elif tailscale_ip:
+                        ws_url = f"wss://{tailscale_ip}/gateway/{username}"
+                        qs = urlencode({"token": gateway_token, "gatewayUrl": ws_url})
+                        management_urls.append(f"https://{tailscale_ip}/gateway/{username}/?{qs}")
             else:
+                # No token - just show port-based URLs
+                if base_path and tailscale_ip:
+                    management_urls.append(f"https://{tailscale_ip}/gateway/{username}/")
                 if tailscale_ip:
                     management_urls.append(f"http://{tailscale_ip}:{port}")
                 management_urls.append(f"http://localhost:{port}")
@@ -149,11 +210,22 @@ async def list_instances(
             if not gateway_token:
                 gateway_token = secrets_mgr.read_secret(username, "gateway_token")
             
+            # Check if Tailscale Serve is enabled in config
+            # Note: Even if enabled, gateways bind to loopback inside containers and need
+            # Tailscale Serve configured INSIDE the container (not on host). Since Tailscale
+            # isn't installed in containers, we use Docker port mapping instead.
+            tailscale_serve_enabled = _is_tailscale_serve_enabled(username, paths)
+            
             if gateway_token:
+                token_param = f"?token={gateway_token}"
+                # Use Docker port mapping URLs (gateways accessible via mapped ports)
+                # HTTP is fine since we're on Tailscale private network
                 if tailscale_ip:
-                    management_urls.append(f"http://{tailscale_ip}:{port}?token={gateway_token}")
-                management_urls.append(f"http://localhost:{port}?token={gateway_token}")
+                    management_urls.append(f"http://{tailscale_ip}:{port}{token_param}")
+                # Localhost URL (for local access)
+                management_urls.append(f"http://localhost:{port}{token_param}")
             else:
+                # No token - just show port-based URLs
                 if tailscale_ip:
                     management_urls.append(f"http://{tailscale_ip}:{port}")
                 management_urls.append(f"http://localhost:{port}")
@@ -194,11 +266,24 @@ async def get_instance_status(
         if not gateway_token:
             gateway_token = secrets_mgr.read_secret(username, "gateway_token")
         
+        # Check if Tailscale Serve is enabled in config
+        # Note: Even if enabled, gateways bind to loopback inside containers and need
+        # Tailscale Serve configured INSIDE the container (not on host). Since Tailscale
+        # isn't installed in containers, we use Docker port mapping instead.
+        tailscale_serve_enabled = _is_tailscale_serve_enabled(username, paths)
+        
         if gateway_token:
+            token_param = f"?token={gateway_token}"
+            # Gateways require HTTPS or localhost for secure context (device identity)
+            # HTTP over Tailscale IP doesn't satisfy this requirement
+            # Frontend will show SSH port forwarding instructions
             if tailscale_ip:
-                management_urls.append(f"http://{tailscale_ip}:{port}?token={gateway_token}")
-            management_urls.append(f"http://localhost:{port}?token={gateway_token}")
+                # Still show the URL, but frontend will warn about secure context
+                management_urls.append(f"http://{tailscale_ip}:{port}{token_param}")
+            # Localhost URL (works if accessed via SSH port forwarding)
+            management_urls.append(f"http://localhost:{port}{token_param}")
         else:
+            # No token - just show port-based URLs
             if tailscale_ip:
                 management_urls.append(f"http://{tailscale_ip}:{port}")
             management_urls.append(f"http://localhost:{port}")
@@ -238,6 +323,16 @@ async def start_instance(
 
     try:
         docker_mgr.start_container(username)
+        # Run openclaw doctor --fix to ensure full authentication
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Running openclaw doctor --fix for started container {username}")
+        doctor_success = docker_mgr.run_doctor_fix(username)
+        if not doctor_success:
+            logger.warning(
+                f"openclaw doctor --fix failed for {username} after start. "
+                "Gateway authentication may not be fully configured."
+            )
         return {"message": f"Started container for '{username}'", "username": username}
     except Exception as e:
         raise HTTPException(
@@ -275,18 +370,28 @@ async def restart_instance(
     username: str,
     _user: str = Depends(get_current_user),
 ):
-    """Restart an instance."""
-    docker_mgr = _get_docker_manager()
+    """Restart an instance.
+    
+    Regenerates openclaw.json with gateway token authentication before restarting
+    to ensure full authentication is set up for gateway URLs and Discord integration.
+    """
+    config = load_config(find_config_path())
+    user_mgr = UserManager(config)
 
-    if not docker_mgr.container_exists(username):
+    if not user_mgr.docker.container_exists(username):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Container for '{username}' does not exist",
         )
 
     try:
-        docker_mgr.restart_container(username)
+        user_mgr.restart_user(username)
         return {"message": f"Restarted container for '{username}'", "username": username}
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

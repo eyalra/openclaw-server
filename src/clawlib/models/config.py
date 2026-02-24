@@ -86,6 +86,7 @@ class UserSecretsConfig(BaseModel):
 
 class UserConfig(BaseModel):
     name: str
+    port: int | None = Field(default=None, ge=1024, le=65535, description="Fixed host port for the gateway (optional; random if unset)")
     channels: ChannelsConfig = ChannelsConfig()
     agent: UserAgentConfig = UserAgentConfig()
     skills: SkillsConfig = SkillsConfig()
@@ -99,6 +100,18 @@ class UserConfig(BaseModel):
             msg = "Username must be 1-32 lowercase alphanumeric characters or hyphens, starting with alphanumeric"
             raise ValueError(msg)
         return v
+
+
+class MaintenanceConfig(BaseModel):
+    """Configuration for the nightly maintenance cycle (backup → restart)."""
+
+    enabled: bool = True
+    restart_time: str = Field(
+        default="02:00",
+        description="Daily maintenance time in HH:MM format (UTC)",
+        pattern=r"^\d{2}:\d{2}$",
+    )
+    backup_before_restart: bool = True
 
 
 class BackupConfig(BaseModel):
@@ -172,6 +185,7 @@ class ClawctlSettings(BaseModel):
     log_level: str = Field(default="info", pattern=r"^(debug|info|warning|error)$")
     knowledge_dir: Path | None = None  # Optional shared knowledge directory (read-only mount) - deprecated, use shared_collections
     backup: BackupConfig = BackupConfig()
+    maintenance: MaintenanceConfig = MaintenanceConfig()
     defaults: DefaultsConfig = DefaultsConfig()
     shared_collections: SharedCollectionsConfig | None = None  # S3-synced shared document collections
 

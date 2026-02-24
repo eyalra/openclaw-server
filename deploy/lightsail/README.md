@@ -183,6 +183,25 @@ deploy/lightsail/
 - Knowledge directory
 - Access URLs
 
+### Phase 6: Setup Web Management Interface
+
+```bash
+./06-setup-web-interface.sh
+```
+
+**What it does:**
+- Updates clawctl to include web command
+- Creates systemd service for web interface
+- Enables and starts the service
+- Configures firewall (if UFW is active)
+- Verifies the interface is accessible
+
+**After completion:**
+- Web interface runs on port 9000 (default)
+- Accessible at `http://<server-ip>:9000` or via Tailscale
+- Service auto-starts on boot
+- Manage with: `sudo systemctl status/start/stop/restart clawctl-web`
+
 ## Managing Deployment
 
 ### Deploy Code Updates

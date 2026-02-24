@@ -8,10 +8,16 @@ LIGHTSAIL_IP=""                              # Your Lightsail instance IP (from 
 LIGHTSAIL_INSTANCE_NAME="openclaw-server"    # Instance name in Lightsail console
 AWS_REGION="us-east-1"                       # AWS region (us-east-1, us-west-2, etc.)
 
-# SSH Configuration
+# Initial SSH Configuration (for fresh Ubuntu servers)
+INITIAL_SSH_USER="ubuntu"                    # Default Ubuntu user (before hardening)
+INITIAL_SSH_PORT="22"                        # Default SSH port (before hardening)
+
+# Final SSH Configuration (after hardening - auto-updated by scripts)
+SSH_USER="openclaw"                          # Hardened user (set by 01-harden-server.sh)
+SSH_PORT="2222"                              # Hardened SSH port (set by 01-harden-server.sh)
+
+# SSH Key
 SSH_KEY="$HOME/.ssh/lightsail-key.pem"        # Path to your SSH private key (.pem file)
-SSH_USER="ubuntu"                            # SSH username (ubuntu for default, openclaw after hardening)
-SSH_PORT="22"                                # SSH port (22 initially, 2222 after hardening)
 
 # Tailscale Configuration (filled after SOP-03)
 TAILSCALE_IP=""                              # Tailscale IP address (100.x.x.x format)

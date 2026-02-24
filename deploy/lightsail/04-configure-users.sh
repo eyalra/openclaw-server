@@ -185,56 +185,50 @@ enabled = true
 token_secret = "discord_token"
 TOML
 
-echo "✓ clawctl.toml created with 2 users"
+echo "✓ clawctl.toml created/updated"
 echo ""
 echo "Now provisioning users interactively..."
 echo ""
 
-# Provision user1
-echo "=========================================="
-echo "Provisioning $user1_name"
-echo "=========================================="
-# Use full path or ensure PATH is set
+# Get all users from config file
 CLAWCTL_CMD="\$(command -v clawctl || echo '\$HOME/.local/venv/clawctl/bin/clawctl')"
-if command -v clawctl >/dev/null 2>&1 || [ -f "\$HOME/.local/venv/clawctl/bin/clawctl" ]; then
-    # Check if container already exists
-    if docker ps -a --format '{{.Names}}' | grep -q "^openclaw-$user1_name$"; then
-        echo "  ✓ Container 'openclaw-$user1_name' already exists, skipping provisioning"
-        echo "  To re-provision, remove the container first: docker rm -f openclaw-$user1_name"
-    else
-        "\$CLAWCTL_CMD" user add $user1_name --config $REMOTE_REPO_PATH/clawctl.toml || {
-            echo "⚠ User provisioning failed for $user1_name"
-            echo "  You may need to run manually: clawctl user add $user1_name"
-        }
-    fi
-else
-    echo "⚠ ERROR: clawctl not found"
-    echo "  Install it first:"
-    echo "    uv venv ~/.local/venv/clawctl"
-    echo "    uv pip install -e '.' --python ~/.local/venv/clawctl/bin/python"
-fi
 
-echo ""
-echo "=========================================="
-echo "Provisioning $user2_name"
-echo "=========================================="
-CLAWCTL_CMD="\$(command -v clawctl || echo '\$HOME/.local/venv/clawctl/bin/clawctl')"
-if command -v clawctl >/dev/null 2>&1 || [ -f "\$HOME/.local/venv/clawctl/bin/clawctl" ]; then
-    # Check if container already exists
-    if docker ps -a --format '{{.Names}}' | grep -q "^openclaw-$user2_name$"; then
-        echo "  ✓ Container 'openclaw-$user2_name' already exists, skipping provisioning"
-        echo "  To re-provision, remove the container first: docker rm -f openclaw-$user2_name"
-    else
-        "\$CLAWCTL_CMD" user add $user2_name --config $REMOTE_REPO_PATH/clawctl.toml || {
-            echo "⚠ User provisioning failed for $user2_name"
-            echo "  You may need to run manually: clawctl user add $user2_name"
-        }
-    fi
+# Extract all user names from clawctl.toml
+USER_NAMES=\$(grep -E '^\s*name\s*=\s*"' "\$REMOTE_REPO_PATH/clawctl.toml" | sed 's/.*name\s*=\s*"\(.*\)".*/\1/' || echo "")
+
+if [ -z "\$USER_NAMES" ]; then
+    echo "⚠ No users found in config file"
 else
-    echo "⚠ ERROR: clawctl not found"
-    echo "  Install it first:"
-    echo "    uv venv ~/.local/venv/clawctl"
-    echo "    uv pip install -e '.' --python ~/.local/venv/clawctl/bin/python"
+    echo "Found users in config: \$(echo \$USER_NAMES | tr '\n' ' ')"
+    echo ""
+    
+    # Provision each user
+    for username in \$USER_NAMES; do
+        echo "=========================================="
+        echo "Provisioning \$username"
+        echo "=========================================="
+        
+        if command -v clawctl >/dev/null 2>&1 || [ -f "\$HOME/.local/venv/clawctl/bin/clawctl" ]; then
+            # Check if container already exists
+            if docker ps -a --format '{{.Names}}' | grep -q "^openclaw-\$username$"; then
+                echo "  ✓ Container 'openclaw-\$username' already exists, skipping provisioning"
+                echo "  To re-provision, remove the container first: docker rm -f openclaw-\$username"
+            else
+                echo "  Provisioning \$username..."
+                "\$CLAWCTL_CMD" user add "\$username" --config "\$REMOTE_REPO_PATH/clawctl.toml" || {
+                    echo "⚠ User provisioning failed for \$username"
+                    echo "  You may need to run manually: clawctl user add \$username"
+                }
+            fi
+        else
+            echo "⚠ ERROR: clawctl not found"
+            echo "  Install it first:"
+            echo "    uv venv ~/.local/venv/clawctl"
+            echo "    uv pip install -e '.' --python ~/.local/venv/clawctl/bin/python"
+            break
+        fi
+        echo ""
+    done
 fi
 
 echo ""

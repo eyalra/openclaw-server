@@ -304,3 +304,86 @@ def user_set_slack(
         console.print(f"[green]✓[/green] Container restarted")
     else:
         console.print(f"[yellow]Container not found. Run 'clawctl user add {name}' first.[/yellow]")
+
+
+def user_set_discord(
+    name: Annotated[str, typer.Argument(help="Username")],
+    token: Annotated[
+        Optional[str],
+        typer.Option("--token", help="Discord bot token (MT... or OD...)"),
+    ] = None,
+    config: Annotated[
+        Optional[Path],
+        typer.Option("--config", "-c", help="Path to clawctl.toml"),
+    ] = None,
+) -> None:
+    """Set Discord token for a user.
+    
+    Prompts for token interactively if not provided via option.
+    After setting token, regenerates openclaw.json and restarts the container.
+    """
+    cfg = load_config_or_exit(config)
+    user = cfg.get_user(name)
+    
+    if user is None:
+        console.print(
+            f"[red]User '{name}' not found in config.[/red] "
+            f"Add a [[users]] block with name = \"{name}\" to clawctl.toml first."
+        )
+        raise typer.Exit(1)
+    
+    if not user.channels.discord.enabled:
+        console.print(
+            f"[yellow]Discord is not enabled for '{name}'.[/yellow] "
+            "Set [users.channels.discord] enabled = true in clawctl.toml first."
+        )
+        raise typer.Exit(1)
+    
+    # Get token value
+    if not token:
+        token = typer.prompt(
+            "Enter Discord bot token (MT... or OD...)",
+            hide_input=True,
+        )
+    
+    if not token.strip():
+        console.print("[red]Token is required.[/red]")
+        raise typer.Exit(1)
+    
+    # Write secret
+    paths = Paths(cfg.clawctl.data_root, cfg.clawctl.build_root)
+    secrets_mgr = SecretsManager(paths)
+    
+    token_secret_name = user.channels.discord.token_secret or "discord_token"
+    
+    secrets_mgr.write_secret(name, token_secret_name, token.strip())
+    
+    console.print(f"[green]✓[/green] Discord token saved for '{name}'")
+    
+    # Regenerate config
+    from clawlib.core.openclaw_config import write_openclaw_config
+    from clawlib.core.user_manager import GATEWAY_TOKEN_SECRET_NAME
+    
+    gateway_token = secrets_mgr.read_secret(name, GATEWAY_TOKEN_SECRET_NAME)
+    if not gateway_token:
+        import secrets as secrets_module
+        gateway_token = secrets_module.token_urlsafe(32)
+        secrets_mgr.write_secret(name, GATEWAY_TOKEN_SECRET_NAME, gateway_token)
+    
+    write_openclaw_config(
+        user,
+        cfg.clawctl.defaults,
+        paths.user_openclaw_config(name),
+        gateway_token=gateway_token,
+    )
+    
+    console.print(f"[green]✓[/green] Regenerated openclaw.json")
+    
+    # Restart container
+    docker_mgr = DockerManager(cfg)
+    if docker_mgr.container_exists(name):
+        console.print("Restarting container...")
+        docker_mgr.restart_container(name)
+        console.print(f"[green]✓[/green] Container restarted")
+    else:
+        console.print(f"[yellow]Container not found. Run 'clawctl user add {name}' first.[/yellow]")

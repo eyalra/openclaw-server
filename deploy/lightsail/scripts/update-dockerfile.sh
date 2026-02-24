@@ -1,3 +1,19 @@
+#!/bin/bash
+# update-dockerfile.sh
+# Update Dockerfile on server with Python fix
+
+set -e
+
+# Load configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/load-config.sh"
+
+echo "Updating Dockerfile on server..."
+echo "Target: $SSH_USER@$LIGHTSAIL_IP:$SSH_PORT"
+echo ""
+
+# Create the fixed Dockerfile content
+cat > /tmp/dockerfile-fix.txt << 'DOCKERFILE_FIX'
 FROM node:22-slim
 
 ARG OPENCLAW_VERSION=latest
@@ -53,8 +69,37 @@ VOLUME /home/node/.openclaw
 # Gateway port
 EXPOSE 18789
 
-# Health check: verify gateway HTTP server is responding (tolerates 404 from basePath)
+# Health check against the gateway HTTP endpoint
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD curl -so /dev/null http://127.0.0.1:18789/ || exit 1
+    CMD curl -sf http://127.0.0.1:18789/ || exit 1
 
 ENTRYPOINT ["entrypoint.sh"]
+DOCKERFILE_FIX
+
+# Copy to server
+scp -P "$SSH_PORT" -i "$SSH_KEY" /tmp/dockerfile-fix.txt "$SSH_USER@$LIGHTSAIL_IP:/tmp/dockerfile-fix.txt"
+
+# Update Dockerfile on server
+ssh -p "$SSH_PORT" -i "$SSH_KEY" "$SSH_USER@$LIGHTSAIL_IP" << 'REMOTE_SCRIPT'
+set -e
+cd ~/openclaw/docker
+if [ -f Dockerfile ]; then
+    cp Dockerfile Dockerfile.backup
+    echo "  Backed up existing Dockerfile"
+fi
+cp /tmp/dockerfile-fix.txt Dockerfile
+echo "  ✓ Dockerfile updated"
+rm /tmp/dockerfile-fix.txt
+REMOTE_SCRIPT
+
+rm /tmp/dockerfile-fix.txt
+
+echo ""
+echo "✓ Dockerfile updated on server"
+echo ""
+echo "Next: Rebuild the Docker image on the server:"
+echo "  ssh -p $SSH_PORT -i $SSH_KEY $SSH_USER@$LIGHTSAIL_IP"
+echo "  cd ~/openclaw/docker"
+echo "  docker build -t openclaw-instance:latest --build-arg OPENCLAW_VERSION=latest ."
+echo ""
+echo "Or retry: ./04-configure-users.sh"

@@ -305,3 +305,66 @@ class TestOpenClawConfig:
         )
         config = generate_openclaw_config(user, DefaultsConfig())
         assert "gmail" not in config.get("hooks", {})
+
+
+class TestUserManagerRestart:
+    """Test that restart_user() regenerates openclaw.json with gateway token."""
+
+    def test_restart_user_regenerates_config_with_gateway_token(
+        self, sample_config: Config, tmp_data_root: Path, tmp_build_root: Path
+    ):
+        """Verify that restart_user() regenerates openclaw.json with gateway token auth."""
+        from unittest.mock import MagicMock, patch
+
+        from clawctl.core.user_manager import UserManager
+
+        user_mgr = UserManager(sample_config)
+        user = sample_config.users[0]
+        username = user.name
+
+        # Setup: provision user (creates initial config with gateway token)
+        required_secrets = user_mgr.secrets.get_required_secrets(user, sample_config.clawctl.defaults)
+        secret_values = {name: f"test_{name}_value" for name, _ in required_secrets}
+        user_mgr.provision_user(user, secret_values)
+
+        # Verify initial config has gateway token
+        config_path = user_mgr.paths.user_openclaw_config(username)
+        assert config_path.exists()
+        initial_config = json.loads(config_path.read_text())
+        assert "gateway" in initial_config
+        assert "auth" in initial_config["gateway"]
+        assert initial_config["gateway"]["auth"]["mode"] == "token"
+        initial_token = initial_config["gateway"]["auth"]["token"]
+        assert len(initial_token) > 0
+
+        # Corrupt the config: remove gateway auth (simulating stale config)
+        initial_config["gateway"].pop("auth")
+        initial_config["gateway"].pop("controlUi", None)
+        config_path.write_text(json.dumps(initial_config, indent=2) + "\n")
+
+        # Mock docker.restart_container to avoid actually restarting
+        with patch.object(user_mgr.docker, "restart_container", MagicMock()):
+            # Call restart_user (should regenerate config)
+            user_mgr.restart_user(username)
+
+        # Verify config was regenerated with gateway token
+        regenerated_config = json.loads(config_path.read_text())
+        assert "gateway" in regenerated_config
+        assert "auth" in regenerated_config["gateway"]
+        assert regenerated_config["gateway"]["auth"]["mode"] == "token"
+        regenerated_token = regenerated_config["gateway"]["auth"]["token"]
+        
+        # Token should match what's stored in secrets
+        stored_token = user_mgr.secrets.read_secret(username, "openclaw_gateway_token")
+        assert regenerated_token == stored_token
+        assert regenerated_token == initial_token  # Should be the same token
+        
+        # Verify controlUi settings for Docker NAT auth
+        assert "controlUi" in regenerated_config["gateway"]
+        assert regenerated_config["gateway"]["controlUi"]["allowInsecureAuth"] is True
+        assert regenerated_config["gateway"]["controlUi"]["dangerouslyDisableDeviceAuth"] is True
+        
+        # Verify Discord channel config is preserved if enabled
+        if user.channels.discord.enabled:
+            assert "discord" in regenerated_config["channels"]
+            assert regenerated_config["channels"]["discord"]["enabled"] is True

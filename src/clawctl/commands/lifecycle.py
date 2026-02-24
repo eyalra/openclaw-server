@@ -10,6 +10,7 @@ from rich.console import Console
 
 from clawlib.core.config import load_config_or_exit
 from clawlib.core.docker_manager import DockerManager
+from clawlib.core.user_manager import UserManager
 
 console = Console()
 
@@ -49,10 +50,14 @@ def restart(
         typer.Option("--config", "-c", help="Path to clawctl.toml"),
     ] = None,
 ) -> None:
-    """Restart a user's container."""
+    """Restart a user's container.
+    
+    Regenerates openclaw.json with gateway token authentication before restarting
+    to ensure full authentication is set up for gateway URLs and Discord integration.
+    """
     cfg = load_config_or_exit(config)
-    docker = DockerManager(cfg)
-    docker.restart_container(name)
+    user_mgr = UserManager(cfg)
+    user_mgr.restart_user(name)
     console.print(f"[green]Restarted container for '{name}'.[/green]")
 
 
