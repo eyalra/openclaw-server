@@ -179,6 +179,25 @@ class DockerManager:
                 volumes[str(knowledge_path)] = {"bind": "/mnt/knowledge", "mode": "ro"}
             # If not exists, silently skip (knowledge dir is optional)
 
+        # Build environment variables from UserSecretsConfig.
+        # Each key in secrets config maps a secret filename to an env var:
+        #   openrouter_api_key = "openrouter_api_key"
+        #   → reads /run/secrets/openrouter_api_key (i.e. secrets_dir/openrouter_api_key)
+        #   → sets OPENROUTER_API_KEY=<value> in container env
+        env_vars: dict[str, str] = {}
+        for field_name, secret_filename in user.secrets.model_extra.items():
+            if not secret_filename:
+                continue
+            secret_path = secrets_dir / str(secret_filename)
+            if secret_path.exists():
+                try:
+                    value = secret_path.read_text().strip()
+                    if value:
+                        env_var_name = field_name.upper()
+                        env_vars[env_var_name] = value
+                except OSError:
+                    pass
+
         self.client.containers.create(
             image=self.image_tag,
             name=name,
@@ -186,6 +205,7 @@ class DockerManager:
             network=_network_name(user.name),
             volumes=volumes,
             ports={"18789/tcp": user.port or None},  # fixed port if configured, else random
+            environment=env_vars if env_vars else None,
             restart_policy={"Name": "unless-stopped"},
             healthcheck={
                 "Test": ["CMD-SHELL", "curl -so /dev/null http://127.0.0.1:18789/ || exit 1"],
@@ -294,6 +314,12 @@ class DockerManager:
             container.remove()
         except docker.errors.NotFound:
             pass
+
+    def recreate_container(self, user: UserConfig) -> None:
+        """Stop, remove, and recreate a user's container (picks up new env vars/config)."""
+        self.remove_container(user.name)
+        self.create_container(user)
+        self.start_container(user.name)
 
     def container_exists(self, username: str) -> bool:
         """Check if a user's container exists."""

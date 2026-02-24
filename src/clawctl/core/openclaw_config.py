@@ -41,7 +41,7 @@ def _is_tailscale_available() -> bool:
 
 
 def generate_openclaw_config(
-    user: UserConfig, defaults: DefaultsConfig, *, gateway_token: str | None = None, base_path: str | None = None
+    user: UserConfig, defaults: DefaultsConfig, *, gateway_token: str | None = None, base_path: str | None = None, discord_token: str | None = None,
 ) -> dict:
     """Generate the openclaw.json content for a user.
 
@@ -137,11 +137,13 @@ def generate_openclaw_config(
     # Don't include Slack in config if disabled - OpenClaw doctor will auto-enable it if present
 
     if user.channels.discord.enabled:
-        config["channels"]["discord"] = {
+        discord_cfg: dict = {
             "enabled": True,
             "groupPolicy": "open",  # Allow all channels/DMs by default
-            # Token read from DISCORD_TOKEN env var
         }
+        if discord_token:
+            discord_cfg["token"] = discord_token
+        config["channels"]["discord"] = discord_cfg
 
     if user.skills.gog.enabled and user.skills.gog.email:
         config.setdefault("hooks", {})["gmail"] = {"account": user.skills.gog.email}
@@ -163,13 +165,22 @@ def write_openclaw_config(
     *,
     gateway_token: str | None = None,
     base_path: str | None = None,
+    discord_token: str | None = None,
 ) -> None:
     """Write the openclaw.json file for a user."""
-    config = generate_openclaw_config(user, defaults, gateway_token=gateway_token, base_path=base_path)
+    config = generate_openclaw_config(user, defaults, gateway_token=gateway_token, base_path=base_path, discord_token=discord_token)
     path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists() and not os.access(path, os.W_OK):
+        try:
+            import subprocess
+            subprocess.run(["sudo", "chown", f"{os.getuid()}:{os.getgid()}", str(path)], check=True, capture_output=True)
+        except Exception:
+            pass
     path.write_text(json.dumps(config, indent=2) + "\n")
+    # Make file and dir writable by both the host user and the container user (uid 1000).
+    # The container needs write access to persist its own config changes (e.g., plugin auto-enable).
     try:
-        os.chmod(path, 0o644)
-        os.chmod(path.parent, 0o755)
+        os.chmod(path, 0o666)
+        os.chmod(path.parent, 0o777)
     except OSError:
         pass

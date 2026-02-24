@@ -267,7 +267,29 @@ fi
 
 echo ""
 echo "=========================================="
+echo "Applying Discord tokens from local secrets..."
+echo "=========================================="
+# Auto-apply any discord tokens stored in local secrets/ directory
+SECRETS_DIR="$SCRIPT_DIR/secrets"
+if [ -d "$SECRETS_DIR" ]; then
+    for token_file in "$SECRETS_DIR"/*/discord_token; do
+        [ -f "$token_file" ] || continue
+        user_for_token="$(basename "$(dirname "$token_file")")"
+        echo "  Found local discord token for '$user_for_token', deploying..."
+        DISCORD_TOKEN="$(cat "$token_file")" \
+            "$SCRIPT_DIR/scripts/set-discord-token.sh" "$user_for_token" || \
+            echo "  ⚠ Failed to set discord token for $user_for_token"
+    done
+else
+    echo "  No local secrets/ directory found."
+    echo "  To configure Discord, run: ./scripts/set-discord-token.sh <username>"
+fi
+
+echo ""
+echo "=========================================="
 echo "Configuration script completed"
 echo "=========================================="
 echo ""
-echo "Next: Run 05-verify-deployment.sh to verify everything works"
+echo "Next steps:"
+echo "  - To configure Discord: ./scripts/set-discord-token.sh <username>"
+echo "  - To verify deployment: ./05-verify-deployment.sh"

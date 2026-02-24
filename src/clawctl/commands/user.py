@@ -370,11 +370,14 @@ def user_set_discord(
         gateway_token = secrets_module.token_urlsafe(32)
         secrets_mgr.write_secret(name, GATEWAY_TOKEN_SECRET_NAME, gateway_token)
     
+    discord_token_value = secrets_mgr.read_secret(name, token_secret_name)
+    
     write_openclaw_config(
         user,
         cfg.clawctl.defaults,
         paths.user_openclaw_config(name),
         gateway_token=gateway_token,
+        discord_token=discord_token_value,
     )
     
     console.print(f"[green]✓[/green] Regenerated openclaw.json")

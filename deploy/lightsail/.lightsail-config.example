@@ -44,8 +44,10 @@ KEEP_SNAPSHOTS=7                             # Number of snapshots to keep
 # Security
 ALLOWED_SSH_IPS=""                           # Comma-separated IPs for SSH (optional, for additional restrictions)
 
-# Discord Configuration (optional, for reference)
-# DISCORD_BOT_TOKEN=""                       # Discord bot token (stored in secrets/, not here)
+# Discord / Channel Tokens
+# These are NOT stored here - they live in secrets/<username>/discord_token
+# Run: ./scripts/set-discord-token.sh <username>
+# Or set DISCORD_TOKEN env var for automation: DISCORD_TOKEN=xxx ./scripts/set-discord-token.sh alice
 
 # Model Provider Configuration (optional, for reference)
 # ANTHROPIC_API_KEY=""                       # Stored in secrets/, not here
