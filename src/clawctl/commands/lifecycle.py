@@ -22,7 +22,7 @@ def start(
         typer.Option("--config", "-c", help="Path to clawctl.toml"),
     ] = None,
 ) -> None:
-    """Start a user's container."""
+    """Start a user's OpenClaw container."""
     cfg = load_config_or_exit(config)
     docker = DockerManager(cfg)
     docker.start_container(name)
@@ -36,7 +36,7 @@ def stop(
         typer.Option("--config", "-c", help="Path to clawctl.toml"),
     ] = None,
 ) -> None:
-    """Stop a user's container."""
+    """Stop a user's OpenClaw container (graceful 30s timeout)."""
     cfg = load_config_or_exit(config)
     docker = DockerManager(cfg)
     docker.stop_container(name)
@@ -50,11 +50,7 @@ def restart(
         typer.Option("--config", "-c", help="Path to clawctl.toml"),
     ] = None,
 ) -> None:
-    """Restart a user's container.
-    
-    Regenerates openclaw.json with gateway token authentication before restarting
-    to ensure full authentication is set up for gateway URLs and Discord integration.
-    """
+    """Restart a user's container (regenerates openclaw.json and runs doctor --fix)."""
     cfg = load_config_or_exit(config)
     user_mgr = UserManager(cfg)
     user_mgr.restart_user(name)

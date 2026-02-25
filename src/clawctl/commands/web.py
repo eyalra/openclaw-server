@@ -38,7 +38,7 @@ def web_start(
         typer.Option("--background", "-d", help="Run in background (daemon mode)"),
     ] = False,
 ) -> None:
-    """Start the web management interface."""
+    """Start the web management interface (dashboard for instances, models, Discord pairing)."""
     # Find config path
     config_path = find_config_path(config)
     if config_path:
@@ -99,7 +99,7 @@ def web_set_password(
         typer.Option("--password", "-p", help="Password to set (prompts if not provided)"),
     ] = None,
 ) -> None:
-    """Set the web admin password as a secret file."""
+    """Set or change the web admin password (stored as bcrypt hash in data/secrets/)."""
     cfg = load_config_or_exit(config)
     paths = Paths(cfg.clawctl.data_root, cfg.clawctl.build_root)
     

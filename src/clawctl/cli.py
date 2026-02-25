@@ -11,22 +11,38 @@ from clawctl import __version__
 
 app = typer.Typer(
     name="clawctl",
-    help="OpenClaw deployment manager — provision and manage isolated OpenClaw instances for teams.",
+    help=(
+        "OpenClaw deployment manager — provision and manage isolated OpenClaw instances.\n\n"
+        "Quick start (fresh deployment):\n\n"
+        "  clawctl host requirements      Check secrets and config are ready\n\n"
+        "  clawctl host provision          Create Lightsail instance + static IP\n\n"
+        "  clawctl host deploy --initial   Push code and secrets to the server\n\n"
+        "  clawctl host setup --initial    Harden, install deps, build Docker, create users, start web\n\n"
+        "Subsequent deploys:\n\n"
+        "  clawctl host deploy && clawctl host setup"
+    ),
     no_args_is_help=True,
 )
 
 # Sub-command groups
-user_app = typer.Typer(help="Manage users", no_args_is_help=True)
-backup_app = typer.Typer(help="Manage backups", no_args_is_help=True)
-backup_schedule_app = typer.Typer(help="Manage backup scheduling", no_args_is_help=True)
-maintenance_app = typer.Typer(help="Manage nightly maintenance (backup + restart)", no_args_is_help=True)
-maintenance_schedule_app = typer.Typer(help="Manage maintenance scheduling", no_args_is_help=True)
-shared_collections_app = typer.Typer(help="Manage shared document collections", no_args_is_help=True)
-shared_collections_schedule_app = typer.Typer(help="Manage shared collections sync scheduling", no_args_is_help=True)
-config_app = typer.Typer(help="Configuration utilities", no_args_is_help=True)
-gog_app = typer.Typer(help="Manage gog Google Workspace integration", no_args_is_help=True)
-web_app = typer.Typer(help="Web management interface", no_args_is_help=True)
-host_app = typer.Typer(help="Manage the remote deployment host", no_args_is_help=True)
+user_app = typer.Typer(help="Add, remove, and list users and their Discord/Slack integrations.", no_args_is_help=True)
+backup_app = typer.Typer(help="Run on-demand backups and manage the periodic backup daemon.", no_args_is_help=True)
+backup_schedule_app = typer.Typer(help="Start, stop, and check the periodic backup daemon.", no_args_is_help=True)
+maintenance_app = typer.Typer(help="Run or schedule nightly maintenance (backup all users, then restart containers).", no_args_is_help=True)
+maintenance_schedule_app = typer.Typer(help="Start, stop, and check the nightly maintenance daemon.", no_args_is_help=True)
+shared_collections_app = typer.Typer(help="Sync and list shared document collections (S3 or local).", no_args_is_help=True)
+shared_collections_schedule_app = typer.Typer(help="Start, stop, and check the periodic sync daemon.", no_args_is_help=True)
+config_app = typer.Typer(help="Validate clawctl.toml and regenerate per-user openclaw.json configs.", no_args_is_help=True)
+gog_app = typer.Typer(help="Set up and test Google Workspace (gog) OAuth integration for users.", no_args_is_help=True)
+web_app = typer.Typer(help="Start the web management UI and manage its admin password.", no_args_is_help=True)
+host_app = typer.Typer(
+    help=(
+        "Full lifecycle management of the remote Lightsail deployment host.\n\n"
+        "Workflow: requirements → provision → deploy --initial → setup --initial\n\n"
+        "After initial setup: deploy → setup (or setup --step users, etc.)"
+    ),
+    no_args_is_help=True,
+)
 
 app.add_typer(user_app, name="user")
 app.add_typer(backup_app, name="backup")

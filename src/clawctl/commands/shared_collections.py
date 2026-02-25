@@ -25,7 +25,7 @@ def sync(
         typer.Option("--config", "-c", help="Path to clawctl.toml"),
     ] = None,
 ) -> None:
-    """Sync shared collections from S3."""
+    """Sync shared document collections from S3 or local source to all user containers."""
     cfg = load_config_or_exit(config)
 
     if not cfg.clawctl.shared_collections:

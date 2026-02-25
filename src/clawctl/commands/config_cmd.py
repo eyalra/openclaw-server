@@ -23,7 +23,7 @@ def validate(
         typer.Option("--config", "-c", help="Path to clawctl.toml"),
     ] = None,
 ) -> None:
-    """Validate the config file."""
+    """Validate clawctl.toml and list configured users."""
     path = find_config_path(config)
 
     if path is None:
