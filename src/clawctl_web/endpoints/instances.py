@@ -151,26 +151,24 @@ async def list_instances(
             
             if gateway_token:
                 from urllib.parse import urlencode
-                
-                # If basePath is configured, generate reverse proxy URLs
-                # The gatewayUrl param tells the control UI where to open the WebSocket
-                if base_path:
-                    tailscale_hostname = _get_tailscale_hostname()
-                    if tailscale_hostname and tailscale_ip:
-                        ws_url = f"wss://{tailscale_hostname}/gateway/{username}"
-                        qs = urlencode({"token": gateway_token, "gatewayUrl": ws_url})
-                        management_urls.append(f"https://{tailscale_hostname}/gateway/{username}/?{qs}")
-                    elif tailscale_ip:
-                        ws_url = f"wss://{tailscale_ip}/gateway/{username}"
-                        qs = urlencode({"token": gateway_token, "gatewayUrl": ws_url})
-                        management_urls.append(f"https://{tailscale_ip}/gateway/{username}/?{qs}")
-            else:
-                # No token - just show port-based URLs
-                if base_path and tailscale_ip:
-                    management_urls.append(f"https://{tailscale_ip}/gateway/{username}/")
+                # Prefer HTTPS via Tailscale Serve + nginx reverse proxy
+                tailscale_hostname = _get_tailscale_hostname()
+                if tailscale_hostname:
+                    ws_url = f"wss://{tailscale_hostname}{base_path}"
+                    qs = urlencode({"token": gateway_token, "gatewayUrl": ws_url})
+                    management_urls.append(f"https://{tailscale_hostname}{base_path}/?{qs}")
+                # Fallback: direct HTTP via Docker port mapping
+                token_param = f"?token={gateway_token}"
                 if tailscale_ip:
-                    management_urls.append(f"http://{tailscale_ip}:{port}")
-                management_urls.append(f"http://localhost:{port}")
+                    management_urls.append(f"http://{tailscale_ip}:{port}{base_path}/{token_param}")
+                management_urls.append(f"http://localhost:{port}{base_path}/{token_param}")
+            else:
+                tailscale_hostname = _get_tailscale_hostname()
+                if tailscale_hostname:
+                    management_urls.append(f"https://{tailscale_hostname}{base_path}/")
+                if tailscale_ip:
+                    management_urls.append(f"http://{tailscale_ip}:{port}{base_path}/")
+                management_urls.append(f"http://localhost:{port}{base_path}/")
         
         # Get model pricing if available
         model_pricing = None

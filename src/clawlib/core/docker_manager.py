@@ -259,11 +259,9 @@ class DockerManager:
                 # Give gateway a moment to start up
                 time.sleep(3)
             
-            # Run openclaw doctor --fix
-            # Use user 1000:1000 to match container user
             logger.debug(f"Executing 'openclaw doctor --fix' in container {container_name}")
             exec_result = container.exec_run(
-                "openclaw doctor --fix",
+                ["sh", "-c", "timeout 30 openclaw doctor --fix"],
                 user="1000:1000",
                 workdir="/home/node",
             )

@@ -25,6 +25,10 @@ def user_add(
         Optional[Path],
         typer.Option("--config", "-c", help="Path to clawctl.toml"),
     ] = None,
+    non_interactive: Annotated[
+        bool,
+        typer.Option("--non-interactive", help="Skip all prompts; use existing secrets only (for automation/rebuild)"),
+    ] = False,
 ) -> None:
     """Provision a new user: create directories, write secrets, start container."""
     cfg = load_config_or_exit(config)
@@ -40,54 +44,63 @@ def user_add(
     manager = UserManager(cfg)
     secrets_mgr = SecretsManager(Paths(cfg.clawctl.data_root, cfg.clawctl.build_root))
 
-    # Collect required secrets interactively
+    # Collect required secrets
     required = secrets_mgr.get_required_secrets(user, cfg.clawctl.defaults)
     secret_values: dict[str, str] = {}
 
     console.print(f"Provisioning user [bold]{name}[/bold]...")
     console.print()
 
-    for secret_name, description in required:
-        # Check if secret already exists
-        if secrets_mgr.secret_exists(name, secret_name):
-            console.print(
-                f"  [yellow]Secret '{secret_name}' ({description}) already exists.[/yellow]"
-            )
+    if non_interactive:
+        # Non-interactive: skip all prompts, use only existing secrets
+        console.print("  [dim]Non-interactive mode: using existing secrets, skipping prompts.[/dim]")
+        for secret_name, description in required:
+            if secrets_mgr.secret_exists(name, secret_name):
+                console.print(f"  [dim]Using existing secret '{secret_name}'[/dim]")
+            else:
+                console.print(f"  [yellow]Secret '{secret_name}' not found — skipping (set it later with set-* scripts)[/yellow]")
+    else:
+        for secret_name, description in required:
+            # Check if secret already exists
+            if secrets_mgr.secret_exists(name, secret_name):
+                console.print(
+                    f"  [yellow]Secret '{secret_name}' ({description}) already exists.[/yellow]"
+                )
+                try:
+                    overwrite = typer.confirm(
+                        "  Do you want to overwrite it?",
+                        default=False,
+                    )
+                except (KeyboardInterrupt, EOFError):
+                    console.print("\n[yellow]Aborted by user[/yellow]")
+                    raise typer.Abort()
+                except Exception as e:
+                    # Handle any unexpected input errors
+                    console.print(f"  [red]Error reading input: {e}[/red]")
+                    console.print("  [dim]Skipping this secret. Run the command again to retry.[/dim]")
+                    continue
+                
+                if not overwrite:
+                    console.print(f"  [dim]Skipping '{secret_name}'[/dim]")
+                    continue
+
             try:
-                overwrite = typer.confirm(
-                    "  Do you want to overwrite it?",
-                    default=False,
+                value = typer.prompt(
+                    f"  Enter {description} ({secret_name})",
+                    hide_input=True,
                 )
             except (KeyboardInterrupt, EOFError):
                 console.print("\n[yellow]Aborted by user[/yellow]")
                 raise typer.Abort()
             except Exception as e:
-                # Handle any unexpected input errors
                 console.print(f"  [red]Error reading input: {e}[/red]")
-                console.print("  [dim]Skipping this secret. Run the command again to retry.[/dim]")
-                continue
-            
-            if not overwrite:
                 console.print(f"  [dim]Skipping '{secret_name}'[/dim]")
                 continue
-
-        try:
-            value = typer.prompt(
-                f"  Enter {description} ({secret_name})",
-                hide_input=True,
-            )
-        except (KeyboardInterrupt, EOFError):
-            console.print("\n[yellow]Aborted by user[/yellow]")
-            raise typer.Abort()
-        except Exception as e:
-            console.print(f"  [red]Error reading input: {e}[/red]")
-            console.print(f"  [dim]Skipping '{secret_name}'[/dim]")
-            continue
-            
-        if not value or not value.strip():
-            console.print(f"  [yellow]Empty value provided, skipping '{secret_name}'[/yellow]")
-            continue
-        secret_values[secret_name] = value.strip()
+                
+            if not value or not value.strip():
+                console.print(f"  [yellow]Empty value provided, skipping '{secret_name}'[/yellow]")
+                continue
+            secret_values[secret_name] = value.strip()
 
     console.print()
 
@@ -105,7 +118,7 @@ def user_add(
         console.print(f"  Dashboard: [link={url}]{url}[/link]")
 
     # Offer inline gog OAuth flow if gog is enabled and email is configured
-    if user.skills.gog.enabled and user.skills.gog.email:
+    if user.skills.gog.enabled and user.skills.gog.email and not non_interactive:
         console.print()
         
         # Check container status before attempting gog auth

@@ -4,10 +4,26 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
 from clawlib.models.config import DefaultsConfig, UserConfig
+
+
+def _get_tailscale_hostname() -> str | None:
+    """Get the MagicDNS hostname of this machine from Tailscale."""
+    try:
+        result = subprocess.run(
+            ["tailscale", "status", "--self", "--json"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0:
+            data = json.loads(result.stdout)
+            return data.get("Self", {}).get("DNSName", "").rstrip(".")
+    except (FileNotFoundError, subprocess.TimeoutExpired, json.JSONDecodeError):
+        pass
+    return None
 
 
 def _is_tailscale_available() -> bool:
@@ -114,11 +130,15 @@ def generate_openclaw_config(
         if use_tailscale_serve:
             # Enable Tailscale identity authentication (more secure)
             gateway["auth"]["allowTailscale"] = True
+        allowed_origins: list[str] = ["*"]
+        ts_hostname = _get_tailscale_hostname()
+        if ts_hostname:
+            allowed_origins.append(f"https://{ts_hostname}")
         control_ui_config: dict = {
             "enabled": True,
             "allowInsecureAuth": True,
             "dangerouslyDisableDeviceAuth": True,
-            "allowedOrigins": ["*"],
+            "allowedOrigins": allowed_origins,
         }
         if base_path:
             control_ui_config["basePath"] = base_path

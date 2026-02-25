@@ -221,12 +221,41 @@ class WebConfig(BaseModel):
     )
 
 
+class HostConfig(BaseModel):
+    """Remote host configuration for deployment."""
+
+    ip: str = ""
+    ssh_user: str = "openclaw"
+    ssh_port: int = Field(default=2222, ge=1, le=65535)
+    ssh_key: Path = Path("~/.ssh/openclaw-lightsail.pem")
+    tailscale_ip: str = ""
+    remote_repo_path: str = "/home/openclaw/openclaw"
+    remote_home: str = "/home/openclaw"
+    initial_ssh_user: str = "ubuntu"
+    initial_ssh_port: int = Field(default=22, ge=1, le=65535)
+    secrets_dir: Path = Path("deploy/lightsail/secrets")
+
+    # AWS Lightsail provisioning
+    aws_region: str = "us-east-2"
+    instance_name: str = ""
+    key_pair_name: str = ""
+    blueprint_id: str = "ubuntu_24_04"
+    bundle_id: str = "small_3_0"
+    static_ip_name: str = ""
+
+    @field_validator("ssh_key", "secrets_dir")
+    @classmethod
+    def expand_home(cls, v: Path) -> Path:
+        return v.expanduser()
+
+
 class Config(BaseModel):
     clawctl: ClawctlSettings
     users: list[UserConfig] = []
-    web: WebConfig | None = None  # Optional web interface config
-    
-    model_config = {"extra": "allow"}  # Allow extra fields for backward compatibility
+    web: WebConfig | None = None
+    host: HostConfig | None = None
+
+    model_config = {"extra": "allow"}
 
     def get_user(self, name: str) -> UserConfig | None:
         """Get a user config by name."""

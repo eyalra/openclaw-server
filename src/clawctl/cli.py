@@ -26,6 +26,7 @@ shared_collections_schedule_app = typer.Typer(help="Manage shared collections sy
 config_app = typer.Typer(help="Configuration utilities", no_args_is_help=True)
 gog_app = typer.Typer(help="Manage gog Google Workspace integration", no_args_is_help=True)
 web_app = typer.Typer(help="Web management interface", no_args_is_help=True)
+host_app = typer.Typer(help="Manage the remote deployment host", no_args_is_help=True)
 
 app.add_typer(user_app, name="user")
 app.add_typer(backup_app, name="backup")
@@ -37,6 +38,7 @@ shared_collections_app.add_typer(shared_collections_schedule_app, name="schedule
 app.add_typer(config_app, name="config")
 app.add_typer(gog_app, name="gog")
 app.add_typer(web_app, name="web")
+app.add_typer(host_app, name="host")
 
 # Global option for config file path
 ConfigOption = Annotated[
@@ -81,6 +83,7 @@ from clawctl.commands.update import update  # noqa: E402
 from clawctl.commands.clean import clean  # noqa: E402
 from clawctl.commands.gog import gog_setup, gog_test  # noqa: E402
 from clawctl.commands.web import web_start, web_set_password  # noqa: E402
+from clawctl.commands.host import host_status, host_setup, host_deploy, host_teardown, host_requirements, host_provision, host_destroy  # noqa: E402
 
 # Register top-level commands
 app.command()(init)
@@ -126,3 +129,11 @@ config_app.command(name="regenerate")(regenerate)
 
 gog_app.command(name="setup")(gog_setup)
 gog_app.command(name="test")(gog_test)
+
+host_app.command(name="status")(host_status)
+host_app.command(name="setup")(host_setup)
+host_app.command(name="deploy")(host_deploy)
+host_app.command(name="teardown")(host_teardown)
+host_app.command(name="requirements")(host_requirements)
+host_app.command(name="provision")(host_provision)
+host_app.command(name="destroy")(host_destroy)
