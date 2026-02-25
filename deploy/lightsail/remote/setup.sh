@@ -225,6 +225,8 @@ step_docker() {
 
     # clawctl virtualenv (system Python, owned by openclaw)
     cd "$REPO_DIR"
+    # Ensure repo is accessible to openclaw user (needed when running from /home/ubuntu)
+    sudo chmod a+rx "$(dirname "$REPO_DIR")" 2>/dev/null || true
     if [ ! -f "$VENV_DIR/bin/python" ]; then
         sudo -u openclaw python3 -m venv "$VENV_DIR"
     fi
@@ -283,6 +285,9 @@ step_users() {
         sudo chown -R 1000:1000 "$REPO_DIR/data/users/$username/openclaw" 2>/dev/null || true
         sudo chmod -R 775 "$REPO_DIR/data/users/$username/openclaw" 2>/dev/null || true
     done
+
+    # Fix secret ownership: provisioning runs as root, but the web service reads as openclaw
+    sudo chown -R openclaw:openclaw "$SECRETS_DIR" 2>/dev/null || true
 
     # Discord tokens
     for username in $USER_NAMES; do
