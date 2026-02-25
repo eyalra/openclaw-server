@@ -4,9 +4,23 @@
 # This file is gitignored - never commit your actual .lightsail-config
 
 # AWS Lightsail Instance Details
-LIGHTSAIL_IP=""                              # Your Lightsail instance IP (from SOP-01)
+LIGHTSAIL_IP=""                              # Auto-populated by 00-provision-instance.sh after static IP is attached
 LIGHTSAIL_INSTANCE_NAME="openclaw-server"    # Instance name in Lightsail console
 AWS_REGION="us-east-1"                       # AWS region (us-east-1, us-west-2, etc.)
+
+# Instance Provisioning (used by 00-provision-instance.sh)
+# Run: ./00-provision-instance.sh  — creates all resources below idempotently
+LIGHTSAIL_KEY_PAIR_NAME="openclaw-key"            # Key pair name in Lightsail
+LIGHTSAIL_BLUEPRINT_ID="ubuntu_22_04"             # OS blueprint (ubuntu_22_04, ubuntu_24_04)
+LIGHTSAIL_BUNDLE_ID="small_3_0"                   # Instance size: nano_3_0=512MB, micro_3_0=1GB, small_3_0=2GB
+LIGHTSAIL_STATIC_IP_NAME="openclaw-static-ip"     # Name for the static IP resource
+
+# AWS credentials — set via environment variables, NOT stored here:
+#   export AWS_ACCESS_KEY_ID=AKIA...
+#   export AWS_SECRET_ACCESS_KEY=...
+#   export AWS_DEFAULT_REGION=us-east-1
+# Or use a named profile:
+#   export AWS_PROFILE=openclaw
 
 # Initial SSH Configuration (for fresh Ubuntu servers)
 INITIAL_SSH_USER="ubuntu"                    # Default Ubuntu user (before hardening)
@@ -21,7 +35,8 @@ SSH_KEY="$HOME/.ssh/lightsail-key.pem"        # Path to your SSH private key (.p
 
 # Tailscale Configuration (filled after SOP-03)
 TAILSCALE_IP=""                              # Tailscale IP address (100.x.x.x format)
-TAILSCALE_AUTH_KEY=""                        # Optional: Pre-auth key for automation (not needed for manual setup)
+# TAILSCALE_AUTH_KEY is stored in secrets/tailscale_auth_key (gitignored), not here
+# Generate at: https://login.tailscale.com/admin/settings/keys (use Reusable key)
 
 # Deployment Paths
 REMOTE_HOME="/home/openclaw"                 # Remote user home directory

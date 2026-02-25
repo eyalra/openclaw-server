@@ -18,6 +18,7 @@ class ChannelSlackConfig(BaseModel):
 class ChannelDiscordConfig(BaseModel):
     enabled: bool = False
     token_secret: str | None = None
+    owner_id: str | None = Field(default=None, description="Discord user ID to pre-approve for DM access on provisioning")
 
 
 class ChannelsConfig(BaseModel):

@@ -473,3 +473,44 @@ ul li {
     color: #721c24;
     border: 1px solid #f5c6cb;
 }
+
+/* Discord pairing */
+.discord-request {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    margin-bottom: 8px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+}
+
+.discord-request-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.discord-id {
+    font-size: 12px;
+    color: #6c757d;
+    font-family: monospace;
+}
+
+.discord-code {
+    font-size: 12px;
+    color: #495057;
+    font-family: monospace;
+    font-weight: bold;
+}
+
+.discord-empty {
+    color: #6c757d;
+    font-style: italic;
+}
+
+.btn-sm {
+    padding: 4px 12px;
+    font-size: 12px;
+}

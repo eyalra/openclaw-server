@@ -372,6 +372,7 @@ async function loadInstances() {
                     <button class="btn btn-primary" onclick="showModelModal('${instance.username}', '${instance.model || ""}')">Change Model</button>
                     <button class="btn btn-secondary" onclick="viewStats('${instance.username}')">Stats</button>
                     <button class="btn btn-secondary" onclick="viewLogs('${instance.username}')">Logs</button>
+                    <button class="btn btn-secondary" onclick="showDiscordPairing('${instance.username}')">Discord</button>
                 </div>
             </div>
         `).join("");
@@ -778,6 +779,53 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
 
+// --- Discord pairing ---
+
+async function showDiscordPairing(username) {
+    document.getElementById("discord-username").textContent = username;
+    const modal = document.getElementById("discord-modal");
+    const container = document.getElementById("discord-pairing-container");
+    modal.style.display = "block";
+    container.innerHTML = "<p>Loading pairing requests...</p>";
+
+    try {
+        const data = await apiCall(`/instances/${username}/discord/pairing`);
+        if (!data.requests || data.requests.length === 0) {
+            container.innerHTML = `
+                <p class="discord-empty">No pending pairing requests.</p>
+                <p><small>When someone DMs this bot on Discord, a pairing request will appear here for approval.</small></p>
+            `;
+            return;
+        }
+        container.innerHTML = data.requests.map(req => `
+            <div class="discord-request">
+                <div class="discord-request-info">
+                    <strong>${req.meta.name || req.meta.tag || "Unknown"}</strong>
+                    <span class="discord-id">${req.discord_user_id}</span>
+                    <span class="discord-code">Code: ${req.code}</span>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="approveDiscordPairing('${username}', '${req.code}')">Approve</button>
+            </div>
+        `).join("");
+    } catch (error) {
+        container.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+    }
+}
+
+async function approveDiscordPairing(username, code) {
+    try {
+        const data = await apiCall(`/instances/${username}/discord/pairing/${code}/approve`, { method: "POST" });
+        alert(`Approved: ${data.message}`);
+        showDiscordPairing(username);
+    } catch (error) {
+        alert(`Failed to approve: ${error.message}`);
+    }
+}
+
+function closeDiscordModal() {
+    document.getElementById("discord-modal").style.display = "none";
+}
+
 // --- Maintenance panel ---
 
 async function fetchMaintenanceStatus() {
@@ -893,6 +941,9 @@ window.startInstance = startInstance;
 window.stopInstance = stopInstance;
 window.restartInstance = restartInstance;
 window.logout = logout;
+window.showDiscordPairing = showDiscordPairing;
+window.approveDiscordPairing = approveDiscordPairing;
+window.closeDiscordModal = closeDiscordModal;
 window.runMaintenanceNow = runMaintenanceNow;
 window.startMaintenanceSchedule = startMaintenanceSchedule;
 window.stopMaintenanceSchedule = stopMaintenanceSchedule;

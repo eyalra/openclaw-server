@@ -135,13 +135,17 @@ class UserManager:
             base_path=base_path,
         )
 
-        # 6. Create and start container
+        # 6. Pre-approve Discord owner if configured
+        if user.channels.discord.enabled and user.channels.discord.owner_id:
+            self._write_discord_allow_from(user.name, [user.channels.discord.owner_id])
+
+        # 7. Create and start container
         if not self.docker.image_exists():
             self.docker.build_image()
         self.docker.create_container(user)
         self.docker.start_container(user.name)
         
-        # 7. Run openclaw doctor --fix to ensure full authentication
+        # 8. Run openclaw doctor --fix to ensure full authentication
         # This ensures gateway URL is properly authenticated and Discord/plugins are enabled
         logger.info(f"Running openclaw doctor --fix for newly provisioned user {user.name}")
         doctor_success = self.docker.run_doctor_fix(user.name)
@@ -151,6 +155,31 @@ class UserManager:
                 "Gateway authentication may not be fully configured. "
                 "Check container logs for details."
             )
+
+    def _write_discord_allow_from(self, username: str, discord_ids: list[str]) -> None:
+        """Write discord-allowFrom.json to pre-approve Discord users for DM access."""
+        import json
+
+        creds_dir = self.paths.user_openclaw_dir(username) / "credentials"
+        creds_dir.mkdir(parents=True, exist_ok=True)
+        allow_file = creds_dir / "discord-allowFrom.json"
+
+        existing_ids: list[str] = []
+        if allow_file.exists():
+            try:
+                data = json.loads(allow_file.read_text())
+                existing_ids = data.get("allowFrom", [])
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        merged = list(dict.fromkeys(existing_ids + discord_ids))
+        allow_file.write_text(json.dumps({"version": 1, "allowFrom": merged}, indent=2) + "\n")
+        try:
+            os.chmod(creds_dir, 0o700)
+            os.chmod(allow_file, 0o600)
+        except OSError:
+            pass
+        logger.info(f"Pre-approved Discord user(s) {discord_ids} for {username}")
 
     def restart_user(self, username: str) -> None:
         """Restart a user's container.

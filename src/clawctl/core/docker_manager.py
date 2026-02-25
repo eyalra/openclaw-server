@@ -260,6 +260,64 @@ class DockerManager:
             logger.exception(f"Unexpected error running doctor --fix for {username}: {e}")
             return False
 
+    def list_discord_pairing(self, username: str) -> list[dict]:
+        """List pending Discord pairing requests for a user's container.
+
+        Returns a list of dicts with keys: code, discord_user_id, meta, requested_at.
+        """
+        container_name = _container_name(username)
+        try:
+            container = self.client.containers.get(container_name)
+            if container.status != "running":
+                return []
+            result = container.exec_run(
+                ["sh", "-c", "cat /home/node/.openclaw/credentials/discord-pairing.json 2>/dev/null || echo '{}'"],
+                user="1000:1000",
+            )
+            if result.exit_code != 0:
+                return []
+            import json
+            data = json.loads(result.output.decode("utf-8", errors="replace"))
+            requests = data.get("requests", [])
+            return [
+                {
+                    "code": r.get("code", ""),
+                    "discord_user_id": r.get("id", ""),
+                    "meta": r.get("meta", {}),
+                    "requested_at": r.get("createdAt", ""),
+                }
+                for r in requests
+            ]
+        except (docker.errors.NotFound, docker.errors.APIError, Exception) as e:
+            logger.warning(f"Failed to list Discord pairing for {username}: {e}")
+            return []
+
+    def approve_discord_pairing(self, username: str, code: str) -> tuple[bool, str]:
+        """Approve a Discord pairing request by code.
+
+        Returns (success, message).
+        """
+        container_name = _container_name(username)
+        try:
+            container = self.client.containers.get(container_name)
+            if container.status != "running":
+                return False, "Container is not running"
+            result = container.exec_run(
+                ["sh", "-c", f"timeout 15 openclaw pairing approve discord {code}"],
+                user="1000:1000",
+                workdir="/home/node",
+            )
+            output = result.output.decode("utf-8", errors="replace").strip() if result.output else ""
+            if result.exit_code == 0:
+                logger.info(f"Approved Discord pairing {code} for {username}")
+                return True, output or "Approved"
+            logger.warning(f"Discord pairing approval failed for {username}: {output}")
+            return False, output or f"Exit code {result.exit_code}"
+        except docker.errors.NotFound:
+            return False, "Container not found"
+        except docker.errors.APIError as e:
+            return False, f"Docker error: {e}"
+
     def stop_container(self, username: str) -> None:
         """Stop a user's container."""
         try:

@@ -363,6 +363,44 @@ async def stop_instance(
         )
 
 
+@router.get("/{username}/discord/pairing")
+async def list_discord_pairing(
+    username: str,
+    _user: str = Depends(get_current_user),
+):
+    """List pending Discord pairing requests for an instance."""
+    docker_mgr = _get_docker_manager()
+    if not docker_mgr.container_exists(username):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Container for '{username}' does not exist",
+        )
+    requests = docker_mgr.list_discord_pairing(username)
+    return {"requests": requests}
+
+
+@router.post("/{username}/discord/pairing/{code}/approve")
+async def approve_discord_pairing(
+    username: str,
+    code: str,
+    _user: str = Depends(get_current_user),
+):
+    """Approve a pending Discord pairing request."""
+    docker_mgr = _get_docker_manager()
+    if not docker_mgr.container_exists(username):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Container for '{username}' does not exist",
+        )
+    success, message = docker_mgr.approve_discord_pairing(username, code)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=message,
+        )
+    return {"message": message, "username": username, "code": code}
+
+
 @router.post("/{username}/restart")
 async def restart_instance(
     username: str,
