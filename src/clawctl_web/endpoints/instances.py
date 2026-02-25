@@ -134,19 +134,17 @@ async def list_instances(
         # Get management URLs
         management_urls = []
         if port:
-            gateway_token = secrets_mgr.read_secret(username, GATEWAY_TOKEN_SECRET_NAME)
+            try:
+                gateway_token = secrets_mgr.read_secret(username, GATEWAY_TOKEN_SECRET_NAME)
+            except PermissionError:
+                gateway_token = None
             if not gateway_token:
-                gateway_token = secrets_mgr.read_secret(username, "gateway_token")
-            
-            # Check if Tailscale Serve is enabled in config
-            # Note: Even if enabled, gateways bind to loopback inside containers and need
-            # Tailscale Serve configured INSIDE the container (not on host). Since Tailscale
-            # isn't installed in containers, we use Docker port mapping instead.
-            tailscale_serve_enabled = _is_tailscale_serve_enabled(username, paths)
+                try:
+                    gateway_token = secrets_mgr.read_secret(username, "gateway_token")
+                except PermissionError:
+                    gateway_token = None
             
             # basePath is always set for reverse-proxy setups (/gateway/{username})
-            # We compute it directly instead of reading from the container config
-            # (which may have restrictive permissions from the gateway process)
             base_path = f"/gateway/{username}"
             
             if gateway_token:
@@ -204,15 +202,15 @@ async def list_instances(
         port = info["port"]
         management_urls = []
         if port:
-            gateway_token = secrets_mgr.read_secret(username, GATEWAY_TOKEN_SECRET_NAME)
+            try:
+                gateway_token = secrets_mgr.read_secret(username, GATEWAY_TOKEN_SECRET_NAME)
+            except PermissionError:
+                gateway_token = None
             if not gateway_token:
-                gateway_token = secrets_mgr.read_secret(username, "gateway_token")
-            
-            # Check if Tailscale Serve is enabled in config
-            # Note: Even if enabled, gateways bind to loopback inside containers and need
-            # Tailscale Serve configured INSIDE the container (not on host). Since Tailscale
-            # isn't installed in containers, we use Docker port mapping instead.
-            tailscale_serve_enabled = _is_tailscale_serve_enabled(username, paths)
+                try:
+                    gateway_token = secrets_mgr.read_secret(username, "gateway_token")
+                except PermissionError:
+                    gateway_token = None
             
             if gateway_token:
                 token_param = f"?token={gateway_token}"
