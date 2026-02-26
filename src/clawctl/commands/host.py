@@ -13,7 +13,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from clawlib.core.config import load_config_or_exit
+from clawlib.core.config import find_config_path, load_config_or_exit
 from clawlib.models.config import HostConfig
 
 console = Console()
@@ -24,13 +24,18 @@ console = Console()
 # ---------------------------------------------------------------------------
 
 def _get_host(config_path: Path | None) -> tuple:
-    """Load config and return (Config, HostConfig), exiting if [host] is missing."""
+    """Load config and return (Config, HostConfig, resolved_config_path).
+
+    Exits if [host] is missing or the config file cannot be found.
+    """
     cfg = load_config_or_exit(config_path)
+    resolved = find_config_path(config_path)
+    config_name = resolved.name if resolved else "clawctl.toml"
     if cfg.host is None:
-        console.print("[red]No [host] section in clawctl.toml.[/red]")
+        console.print(f"[red]No [host] section in {config_name}.[/red]")
         console.print("Add a [host] section with ip, ssh_key, etc.")
         raise typer.Exit(1)
-    return cfg, cfg.host
+    return cfg, cfg.host, resolved
 
 
 def _ssh_cmd(host: HostConfig, *, initial: bool = False) -> list[str]:
@@ -130,15 +135,14 @@ def _get_boto3_client(host: HostConfig, service: str):
     return boto3.client(service, region_name=host.aws_region)
 
 
-def _update_toml_field(field: str, value: str) -> None:
-    """Update a single field in the [host] section of clawctl.toml."""
-    toml_path = _repo_root() / "clawctl.toml"
+def _update_toml_field(toml_path: Path, field: str, value: str) -> None:
+    """Update a single field in the given config file."""
     import re
     text = toml_path.read_text()
     pattern = rf'^({re.escape(field)}\s*=\s*).*$'
     new_text, n = re.subn(pattern, rf'\g<1>"{value}"', text, flags=re.MULTILINE)
     if n == 0:
-        console.print(f"[yellow]Could not update {field} in clawctl.toml (field not found)[/yellow]")
+        console.print(f"[yellow]Could not update {field} in {toml_path.name} (field not found)[/yellow]")
         return
     toml_path.write_text(new_text)
 
@@ -154,7 +158,7 @@ def host_requirements(
     ] = None,
 ) -> None:
     """Verify all secrets and config needed for deployment exist locally."""
-    cfg, host = _get_host(config)
+    cfg, host, _resolved = _get_host(config)
 
     table = Table(title="Deployment Requirements")
     table.add_column("Check", style="bold")
@@ -250,7 +254,7 @@ def host_status(
     ] = None,
 ) -> None:
     """Show the current state of the remote host."""
-    cfg, host = _get_host(config)
+    cfg, host, _resolved = _get_host(config)
 
     console.print(f"Host: [bold]{host.ssh_user}@{host.ip}:{host.ssh_port}[/bold]\n")
 
@@ -341,7 +345,7 @@ def host_deploy(
     ] = None,
 ) -> None:
     """Rsync code and secrets to the remote host, then reinstall clawctl."""
-    cfg, host = _get_host(config)
+    cfg, host, resolved_config = _get_host(config)
     repo = _repo_root()
 
     user = host.initial_ssh_user if initial else host.ssh_user
@@ -369,7 +373,21 @@ def host_deploy(
         raise typer.Exit(1)
     console.print("  [green]Repo synced[/green]")
 
-    # 2. Push secrets
+    # 2. Install the specified config as clawctl.toml on the remote
+    if resolved_config and resolved_config.name != "clawctl.toml":
+        scp_config = [
+            "scp", "-P", str(port), "-i", str(host.ssh_key),
+            "-o", "StrictHostKeyChecking=no",
+            str(resolved_config),
+            f"{user}@{host.ip}:{remote_repo}/clawctl.toml",
+        ]
+        result_cfg = _run_local(scp_config, check=False)
+        if result_cfg.returncode != 0:
+            console.print(f"[yellow]Config install warning:[/yellow] {result_cfg.stderr.strip()}")
+        else:
+            console.print(f"  [green]Installed {resolved_config.name} as clawctl.toml on remote[/green]")
+
+    # 3. Push secrets
     secrets = _secrets_dir(host)
     if secrets.is_dir():
         console.print("Syncing secrets...")
@@ -398,7 +416,7 @@ def host_deploy(
                 _run_local(scp_base + [str(item), f"{target}:{remote_dir}/password_plaintext"], check=False)
                 console.print(f"  [green]web_admin_password[/green]")
 
-    # 3. Push shared collections if they exist locally
+    # 4. Push shared collections if they exist locally
     local_shared = repo / "data" / "shared"
     if local_shared.is_dir() and any(local_shared.iterdir()):
         console.print("Syncing shared collections...")
@@ -421,7 +439,7 @@ def host_deploy(
         console.print("\n[green]Initial deploy complete.[/green]")
         console.print(f"Code deployed to {remote_repo}")
     else:
-        # 4. Reinstall clawctl on server (only when deploying to the final user)
+        # 5. Reinstall clawctl on server (only when deploying to the final user)
         console.print("Reinstalling clawctl on server...")
         install_cmd = (
             "export PATH=$HOME/.local/bin:$HOME/.local/venv/clawctl/bin:$PATH && "
@@ -456,7 +474,7 @@ def host_setup(
     ] = None,
 ) -> None:
     """Run setup on the remote host (idempotent). Installs deps, builds Docker, provisions users, starts web."""
-    cfg, host = _get_host(config)
+    cfg, host, _resolved = _get_host(config)
 
     remote_step = step or "all"
     user = host.initial_ssh_user if initial else host.ssh_user
@@ -552,11 +570,11 @@ def host_provision(
     ] = None,
 ) -> None:
     """Provision a Lightsail instance (idempotent). Creates instance, static IP, firewall rules."""
-    cfg, host = _get_host(config)
+    cfg, host, resolved_config = _get_host(config)
 
     for field in ("instance_name", "key_pair_name", "static_ip_name"):
         if not getattr(host, field):
-            console.print(f"[red]host.{field} is not set in clawctl.toml[/red]")
+            console.print(f"[red]host.{field} is not set in {resolved_config.name}[/red]")
             raise typer.Exit(1)
 
     ls = _get_boto3_client(host, "lightsail")
@@ -666,10 +684,10 @@ def host_provision(
         except Exception:
             pass  # Fine if the port was never open
 
-    # Update clawctl.toml with the IP
+    # Update config with the IP
     if ip_address and ip_address != host.ip:
-        _update_toml_field("ip", ip_address)
-        console.print(f"\nUpdated host.ip = {ip_address} in clawctl.toml")
+        _update_toml_field(resolved_config, "ip", ip_address)
+        console.print(f"\nUpdated host.ip = {ip_address} in {resolved_config.name}")
 
     # Clear known_hosts for this IP to avoid SSH host key warnings
     if ip_address:
@@ -712,7 +730,7 @@ def host_destroy(
     ] = None,
 ) -> None:
     """Destroy the Lightsail instance and release the static IP."""
-    cfg, host = _get_host(config)
+    cfg, host, resolved_config = _get_host(config)
 
     if not confirm:
         console.print("This will [red bold]DELETE[/red bold] the Lightsail instance and release the static IP.")
@@ -751,7 +769,7 @@ def host_destroy(
         console.print("  Static IP not found, skipping.")
 
     # Clear IP in config
-    _update_toml_field("ip", "")
+    _update_toml_field(resolved_config, "ip", "")
     console.print("\n[green]Teardown complete. Key pair preserved.[/green]")
 
 
@@ -770,7 +788,7 @@ def host_teardown(
     ] = None,
 ) -> None:
     """Stop and remove all containers on the remote host."""
-    cfg, host = _get_host(config)
+    cfg, host, _resolved = _get_host(config)
 
     if not confirm:
         console.print("This will stop and remove all OpenClaw containers on the server.")

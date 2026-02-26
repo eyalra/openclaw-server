@@ -9,7 +9,7 @@ from typing import Annotated, Optional
 import typer
 from rich.console import Console
 
-from clawlib.core.config import load_config_or_exit
+from clawlib.core.config import find_config_path, load_config_or_exit
 from clawlib.core.docker_manager import DockerManager
 
 console = Console()
@@ -36,13 +36,15 @@ def clean(
     directory (user secrets, workspaces, backups).
     """
     cfg = load_config_or_exit(config)
+    resolved_config = find_config_path(config)
+    config_name = resolved_config.name if resolved_config else "clawctl.toml"
 
     if not yes:
         console.print("[bold red]This will:[/bold red]")
         console.print("  • Stop and remove all OpenClaw containers")
         console.print("  • Remove all Docker networks")
         console.print(f"  • Delete build directory ({cfg.clawctl.build_root})")
-        console.print("  • Delete clawctl.toml")
+        console.print(f"  • Delete {config_name}")
         if all_data:
             console.print(
                 f"  • [bold red]Delete ALL user data[/bold red] ({cfg.clawctl.data_root}) "
@@ -81,10 +83,10 @@ def clean(
             console.print(f"[red]Removed[/red] {data_root}")
 
     # 4. Remove config file
-    config_file = Path("clawctl.toml")
-    if config_file.is_file():
+    config_file = find_config_path(config)
+    if config_file and config_file.is_file():
         config_file.unlink()
-        console.print("[yellow]Removed[/yellow] clawctl.toml")
+        console.print(f"[yellow]Removed[/yellow] {config_file.name}")
 
     if all_data:
         console.print("[green]Full clean complete — everything removed.[/green]")
