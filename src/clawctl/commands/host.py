@@ -1,4 +1,4 @@
-"""clawctl host — manage the remote deployment host."""
+"""clawctl server — manage the remote deployment server."""
 
 from __future__ import annotations
 
@@ -148,7 +148,7 @@ def _update_toml_field(toml_path: Path, field: str, value: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# clawctl host requirements
+# clawctl server requirements
 # ---------------------------------------------------------------------------
 
 def host_requirements(
@@ -178,7 +178,7 @@ def host_requirements(
             table.add_row(name, "[red]MISSING[/red]", detail)
 
     # Host config
-    check("host.ip", bool(host.ip), host.ip or "not set (run: clawctl host provision)")
+    check("host.ip", bool(host.ip), host.ip or "not set (run: clawctl server provision)")
     check("host.ssh_key", host.ssh_key.expanduser().exists(), str(host.ssh_key))
 
     # AWS credentials (secrets files, env vars, or ~/.aws/credentials)
@@ -244,7 +244,7 @@ def host_requirements(
 
 
 # ---------------------------------------------------------------------------
-# clawctl host status
+# clawctl server status / clawctl status
 # ---------------------------------------------------------------------------
 
 def host_status(
@@ -331,7 +331,7 @@ sudo systemctl is-active clawctl-web 2>/dev/null || echo "inactive"
 
 
 # ---------------------------------------------------------------------------
-# clawctl host deploy
+# clawctl server deploy
 # ---------------------------------------------------------------------------
 
 def host_deploy(
@@ -456,7 +456,7 @@ def host_deploy(
 
 
 # ---------------------------------------------------------------------------
-# clawctl host setup
+# clawctl server setup
 # ---------------------------------------------------------------------------
 
 def host_setup(
@@ -560,7 +560,7 @@ def host_setup(
 
 
 # ---------------------------------------------------------------------------
-# clawctl host provision
+# clawctl server provision
 # ---------------------------------------------------------------------------
 
 def host_provision(
@@ -697,7 +697,7 @@ def host_provision(
     console.print(f"\n[green bold]Instance ready![/green bold]")
     console.print(f"  IP:     {ip_address}")
     console.print(f"  Region: {host.aws_region}")
-    console.print(f"\nNext: clawctl host deploy --initial && clawctl host setup --initial")
+    console.print(f"\nNext: clawctl server deploy --initial && clawctl server setup --initial")
 
 
 def _wait_instance(ls, name: str, target: str, timeout: int = 120) -> None:
@@ -716,7 +716,7 @@ def _wait_instance(ls, name: str, target: str, timeout: int = 120) -> None:
 
 
 # ---------------------------------------------------------------------------
-# clawctl host destroy
+# clawctl server destroy
 # ---------------------------------------------------------------------------
 
 def host_destroy(
@@ -774,7 +774,7 @@ def host_destroy(
 
 
 # ---------------------------------------------------------------------------
-# clawctl host teardown
+# clawctl server teardown
 # ---------------------------------------------------------------------------
 
 def host_teardown(

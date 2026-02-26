@@ -1,4 +1,4 @@
-"""clawctl logs — tail container logs."""
+"""clawctl instance logs — tail container logs."""
 
 from __future__ import annotations
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 # remote/setup.sh — Server-side provisioning script for OpenClaw on Lightsail.
 #
-# Called by: clawctl host setup [--step <step>]
+# Called by: clawctl server setup [--step <step>]
 #   The Python CLI SSHes in and runs: sudo /path/to/setup.sh <step>
 #
 # Idempotent: every step is safe to re-run at any time.
@@ -17,18 +17,18 @@
 #   all     — Run all steps in order (default)
 #
 # Prerequisites:
-#   - Code and secrets already deployed via: clawctl host deploy [--initial]
+#   - Code and secrets already deployed via: clawctl server deploy [--initial]
 #   - Secrets layout: data/secrets/<user>/{openrouter_api_key,discord_token,...}
 #   - Tailscale auth key:  deploy/lightsail/secrets/tailscale_auth_key
 #   - Web admin password:  data/secrets/web_admin/password_plaintext
 #
 # First-time setup:
-#   clawctl host deploy --initial   # as ubuntu@22
-#   clawctl host setup --initial    # runs harden, then reboots, SSH resumes on 2222
+#   clawctl server deploy --initial   # as ubuntu@22
+#   clawctl server setup --initial    # runs harden, then reboots, SSH resumes on 2222
 #
 # Subsequent updates:
-#   clawctl host deploy             # as openclaw@2222
-#   clawctl host setup              # or: clawctl host setup --step users
+#   clawctl server deploy             # as openclaw@2222
+#   clawctl server setup              # or: clawctl server setup --step users
 
 set -e
 
@@ -497,7 +497,7 @@ esac
 
 # After all steps, remove the temporary port 22 UFW rule (Lightsail firewall
 # controls external access; port 22 stays open during setup for safety, then
-# clawctl host setup closes it in Lightsail firewall after the reboot)
+# clawctl server setup closes it in Lightsail firewall after the reboot)
 sudo ufw delete allow 22/tcp 2>/dev/null || true
 
 log "Done: $STEP"

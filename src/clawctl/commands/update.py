@@ -1,4 +1,4 @@
-"""clawctl update — update OpenClaw version across containers."""
+"""clawctl instance update — update OpenClaw version across containers."""
 
 from __future__ import annotations
 

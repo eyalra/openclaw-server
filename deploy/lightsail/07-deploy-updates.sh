@@ -96,7 +96,7 @@ echo "  ✓ clawctl reinstalled"
 echo ""
 echo "Step 3: Rebuilding Docker image..."
 if command -v clawctl >/dev/null 2>&1 && [ -f "clawctl.toml" ]; then
-    clawctl update --config clawctl.toml || {
+    clawctl instance update --config clawctl.toml || {
         echo "  ⚠ Update failed, trying manual build..."
         docker build -t openclaw-instance:latest --build-arg OPENCLAW_VERSION=latest docker/ || {
             echo "  ✗ Docker build failed"
@@ -127,12 +127,12 @@ try:
     print(f'✓ Updated containers: {updated}')
 except Exception as e:
     print(f'⚠ Rebuild failed: {e}')
-    print('Trying restart-all instead...')
+    print('Trying instance restart-all instead...')
     import subprocess
-    subprocess.run(['clawctl', 'restart-all', '--config', 'clawctl.toml'])
+    subprocess.run(['clawctl', 'instance', 'restart-all', '--config', 'clawctl.toml'])
 " 2>/dev/null || {
-        echo "  Falling back to restart-all..."
-        clawctl restart-all --config clawctl.toml || true
+        echo "  Falling back to instance restart-all..."
+        clawctl instance restart-all --config clawctl.toml || true
     }
 else
     echo "  ⚠ clawctl not available, restarting containers manually..."
@@ -146,7 +146,7 @@ echo "Step 5: Verifying deployment..."
 sleep 3
 if command -v clawctl >/dev/null 2>&1 && [ -f "clawctl.toml" ]; then
     echo ""
-    clawctl status --config clawctl.toml || true
+    clawctl instance status --config clawctl.toml || true
 else
     echo ""
     docker ps --filter "name=openclaw-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"

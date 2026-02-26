@@ -1,4 +1,4 @@
-"""clawctl start/stop/restart commands."""
+"""clawctl instance start/stop/restart commands."""
 
 from __future__ import annotations
 

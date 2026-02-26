@@ -57,13 +57,13 @@ Edit source files:
 clawctl user add testuser
 
 # Start container
-clawctl start testuser
+clawctl instance start testuser
 
 # Check status
-clawctl status
+clawctl instance status
 
 # View logs
-clawctl logs testuser
+clawctl instance logs testuser
 
 # Test specific functionality
 clawctl config validate
@@ -74,14 +74,14 @@ clawctl user list
 
 ```bash
 # Rebuild image locally
-clawctl update
+clawctl instance update
 
 # Or manually
 docker build -t openclaw-instance:latest --build-arg OPENCLAW_VERSION=latest docker/
 
 # Test with new image
 clawctl user add testuser2
-clawctl start testuser2
+clawctl instance start testuser2
 ```
 
 ### 4. Test Knowledge Directory Mount
@@ -100,7 +100,7 @@ EOF
 # Rebuild containers to test mount
 clawctl clean
 clawctl user add testuser
-clawctl start testuser
+clawctl instance start testuser
 
 # Verify mount in container
 docker exec openclaw-testuser ls -la /mnt/knowledge/
@@ -149,8 +149,8 @@ cd deploy/lightsail
 ssh -p 2222 -i <key> openclaw@<ip>
 cd ~/openclaw
 git pull origin main
-clawctl update --config clawctl.toml
-clawctl restart-all --config clawctl.toml
+clawctl instance update --config clawctl.toml
+clawctl instance restart-all --config clawctl.toml
 ```
 
 ### Deployment Script Details
@@ -200,12 +200,12 @@ Before deploying to Lightsail, verify locally:
 - [ ] All unit tests pass: `pytest tests/`
 - [ ] Code lints cleanly (if linter configured)
 - [ ] Can create user: `clawctl user add testuser`
-- [ ] Container starts: `clawctl start testuser`
-- [ ] Container accessible: `clawctl status`
+- [ ] Container starts: `clawctl instance start testuser`
+- [ ] Container accessible: `clawctl instance status`
 - [ ] Knowledge directory mounts (if applicable)
 - [ ] Discord/Slack channels work (if applicable)
 - [ ] Secrets are properly loaded
-- [ ] Logs show no errors: `clawctl logs testuser`
+- [ ] Logs show no errors: `clawctl instance logs testuser`
 - [ ] Can clean up: `clawctl clean`
 
 ## Hotfix Workflow
@@ -218,7 +218,7 @@ git checkout -b hotfix/critical-fix main
 
 # Make fix, test locally
 clawctl user add testuser
-clawctl start testuser
+clawctl instance start testuser
 # ... verify fix works ...
 
 # Commit and push
@@ -232,8 +232,8 @@ ssh -p "$SSH_PORT" -i "$SSH_KEY" "$SSH_USER@$LIGHTSAIL_IP" << EOF
 cd ~/openclaw
 git fetch origin
 git checkout hotfix/critical-fix
-clawctl update --config clawctl.toml
-clawctl restart-all --config clawctl.toml
+clawctl instance update --config clawctl.toml
+clawctl instance restart-all --config clawctl.toml
 EOF
 
 # Merge back to main after verification
@@ -291,7 +291,7 @@ git push origin main
    ```bash
    docker build -t openclaw-instance:latest docker/
    clawctl user add testuser
-   clawctl start testuser
+   clawctl instance start testuser
    ```
 
 3. **Deploy:**

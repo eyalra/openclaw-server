@@ -229,7 +229,7 @@ Wipes everything and rebuilds from scratch. Use with caution!
 ```bash
 ssh -p 2222 -i <key> openclaw@<ip>
 cd ~/openclaw
-clawctl status --config clawctl.toml
+clawctl instance status --config clawctl.toml
 ```
 
 ### View Logs
@@ -238,7 +238,7 @@ clawctl status --config clawctl.toml
 ssh -p 2222 -i <key> openclaw@<ip>
 docker logs openclaw-user1
 # Or use clawctl
-clawctl logs user1 --config clawctl.toml
+clawctl instance logs user1 --config clawctl.toml
 ```
 
 ## Accessing OpenClaw

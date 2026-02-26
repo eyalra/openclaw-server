@@ -75,13 +75,13 @@ else
 fi
 
 echo ""
-echo "=== clawctl status ==="
+echo "=== clawctl instance status ==="
 CLAWCTL_VENV_PATH="\$HOME/.local/venv/clawctl"
 if command -v clawctl >/dev/null 2>&1 && [ -f "clawctl.toml" ]; then
-    clawctl status --config clawctl.toml || echo "  ⚠ Status command failed"
+    clawctl instance status --config clawctl.toml || echo "  ⚠ Status command failed"
 elif [ -d "\$CLAWCTL_VENV_PATH" ] && [ -f "\$CLAWCTL_VENV_PATH/bin/clawctl" ]; then
     echo "  Using venv clawctl:"
-    "\$CLAWCTL_VENV_PATH/bin/clawctl" status --config clawctl.toml || echo "  ⚠ Status command failed"
+    "\$CLAWCTL_VENV_PATH/bin/clawctl" instance status --config clawctl.toml || echo "  ⚠ Status command failed"
 else
     echo "  ⚠ clawctl not available"
     echo "  Venv path checked: \$CLAWCTL_VENV_PATH"

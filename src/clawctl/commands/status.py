@@ -1,4 +1,4 @@
-"""clawctl status — show status of all containers."""
+"""clawctl instance status — show status of all containers."""
 
 from __future__ import annotations
 
@@ -9,6 +9,8 @@ from typing import Annotated, Optional
 import typer
 from rich.console import Console
 from rich.table import Table
+
+from docker.errors import DockerException
 
 from clawlib.core.config import load_config_or_exit
 from clawlib.core.docker_manager import DockerManager
@@ -76,7 +78,19 @@ def status(
 ) -> None:
     """Show the status of all user containers."""
     cfg = load_config_or_exit(config)
-    docker = DockerManager(cfg)
+    try:
+        docker = DockerManager(cfg)
+    except DockerException:
+        console.print("[red]Cannot connect to Docker.[/red]")
+        console.print("This is a server-side command. SSH into the server first:")
+        cfg_host = cfg.host
+        if cfg_host and cfg_host.ip:
+            console.print(
+                f"  ssh -p {cfg_host.ssh_port} -i {cfg_host.ssh_key} "
+                f"{cfg_host.ssh_user}@{cfg_host.ip}"
+            )
+        console.print("\nOr check the server remotely with: [bold]clawctl status[/bold]")
+        raise typer.Exit(1)
     secrets_mgr = SecretsManager(Paths(cfg.clawctl.data_root, cfg.clawctl.build_root))
     statuses = docker.get_all_statuses()
     tailscale_ip = _get_tailscale_ip()

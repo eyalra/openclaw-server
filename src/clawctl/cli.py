@@ -14,12 +14,12 @@ app = typer.Typer(
     help=(
         "OpenClaw deployment manager — provision and manage isolated OpenClaw instances.\n\n"
         "Quick start (fresh deployment):\n\n"
-        "  clawctl host requirements      Check secrets and config are ready\n\n"
-        "  clawctl host provision          Create Lightsail instance + static IP\n\n"
-        "  clawctl host deploy --initial   Push code and secrets to the server\n\n"
-        "  clawctl host setup --initial    Harden, install deps, build Docker, create users, start web\n\n"
+        "  clawctl server requirements      Check secrets and config are ready\n\n"
+        "  clawctl server provision          Create Lightsail instance + static IP\n\n"
+        "  clawctl server deploy --initial   Push code and secrets to the server\n\n"
+        "  clawctl server setup --initial    Harden, install deps, build Docker, create users, start web\n\n"
         "Subsequent deploys:\n\n"
-        "  clawctl host deploy && clawctl host setup"
+        "  clawctl server deploy && clawctl server setup"
     ),
     no_args_is_help=True,
 )
@@ -36,11 +36,19 @@ files_app = typer.Typer(help="Push, list, and manage per-user files exposed at /
 config_app = typer.Typer(help="Validate clawctl.toml and regenerate per-user openclaw.json configs.", no_args_is_help=True)
 gog_app = typer.Typer(help="Set up and test Google Workspace (gog) OAuth integration for users.", no_args_is_help=True)
 web_app = typer.Typer(help="Start the web management UI and manage its admin password.", no_args_is_help=True)
-host_app = typer.Typer(
+server_app = typer.Typer(
     help=(
-        "Full lifecycle management of the remote Lightsail deployment host.\n\n"
+        "Full lifecycle management of the remote deployment server.\n\n"
         "Workflow: requirements → provision → deploy --initial → setup --initial\n\n"
         "After initial setup: deploy → setup (or setup --step users, etc.)"
+    ),
+    no_args_is_help=True,
+)
+instance_app = typer.Typer(
+    help=(
+        "Manage Docker container instances (server-side).\n\n"
+        "These commands run on the server where Docker is installed.\n"
+        "SSH in first, then use clawctl instance <command>."
     ),
     no_args_is_help=True,
 )
@@ -56,7 +64,8 @@ app.add_typer(files_app, name="files")
 app.add_typer(config_app, name="config")
 app.add_typer(gog_app, name="gog")
 app.add_typer(web_app, name="web")
-app.add_typer(host_app, name="host")
+app.add_typer(server_app, name="server")
+app.add_typer(instance_app, name="instance")
 
 # Global option for config file path
 ConfigOption = Annotated[
@@ -104,61 +113,71 @@ from clawctl.commands.gog import gog_setup, gog_test  # noqa: E402
 from clawctl.commands.web import web_start, web_set_password  # noqa: E402
 from clawctl.commands.host import host_status, host_setup, host_deploy, host_teardown, host_requirements, host_provision, host_destroy  # noqa: E402
 
-# Register top-level commands
+# Top-level commands
 app.command()(init)
-app.command()(start)
-app.command()(stop)
-app.command()(restart)
-app.command(name="start-all")(start_all)
-app.command(name="stop-all")(stop_all)
-app.command()(status)
-app.command()(logs)
-app.command()(update)
+app.command(name="status")(host_status)
 app.command()(clean)
+
+# Instance commands (container lifecycle — runs on the server)
+instance_app.command(name="start")(start)
+instance_app.command(name="stop")(stop)
+instance_app.command(name="restart")(restart)
+instance_app.command(name="start-all")(start_all)
+instance_app.command(name="stop-all")(stop_all)
+instance_app.command(name="status")(status)
+instance_app.command(name="logs")(logs)
+instance_app.command(name="update")(update)
 
 # Web commands
 web_app.command(name="start")(web_start)
 web_app.command(name="set-password")(web_set_password)
 
-# Register sub-commands
+# User commands
 user_app.command(name="add")(user_add)
 user_app.command(name="remove")(user_remove)
 user_app.command(name="list")(user_list)
 user_app.command(name="set-slack")(user_set_slack)
 user_app.command(name="set-discord")(user_set_discord)
 
+# Backup commands
 backup_app.command(name="run")(backup_run)
 backup_schedule_app.command(name="start")(schedule_start)
 backup_schedule_app.command(name="stop")(schedule_stop)
 backup_schedule_app.command(name="status")(schedule_status)
 
+# Maintenance commands
 maintenance_app.command(name="run")(maintenance_run)
 maintenance_schedule_app.command(name="start")(maintenance_schedule_start)
 maintenance_schedule_app.command(name="stop")(maintenance_schedule_stop)
 maintenance_schedule_app.command(name="status")(maintenance_schedule_status)
 
+# Shared collections commands
 shared_collections_app.command(name="sync")(sync)
 shared_collections_app.command(name="list")(list_collections)
 shared_collections_schedule_app.command(name="start")(sc_schedule_start)
 shared_collections_schedule_app.command(name="stop")(sc_schedule_stop)
 shared_collections_schedule_app.command(name="status")(sc_schedule_status)
 
+# Files commands
 files_app.command(name="push")(files_push)
 files_app.command(name="list")(files_list)
 files_app.command(name="remove")(files_remove)
 files_app.command(name="remove-all")(files_remove_all)
 files_app.command(name="verify")(files_verify)
 
+# Config commands
 config_app.command(name="validate")(validate)
 config_app.command(name="regenerate")(regenerate)
 
+# Gog commands
 gog_app.command(name="setup")(gog_setup)
 gog_app.command(name="test")(gog_test)
 
-host_app.command(name="status")(host_status)
-host_app.command(name="setup")(host_setup)
-host_app.command(name="deploy")(host_deploy)
-host_app.command(name="teardown")(host_teardown)
-host_app.command(name="requirements")(host_requirements)
-host_app.command(name="provision")(host_provision)
-host_app.command(name="destroy")(host_destroy)
+# Server commands (remote deployment lifecycle)
+server_app.command(name="status")(host_status)
+server_app.command(name="setup")(host_setup)
+server_app.command(name="deploy")(host_deploy)
+server_app.command(name="teardown")(host_teardown)
+server_app.command(name="requirements")(host_requirements)
+server_app.command(name="provision")(host_provision)
+server_app.command(name="destroy")(host_destroy)

@@ -291,7 +291,7 @@ def gog_setup(
         if container.status != "running":
             console.print(
                 f"[red]Container '{container_name}' is not running (status: {container.status}).[/red] "
-                f"Run `clawctl start {name}` first."
+                f"Run `clawctl instance start {name}` first."
             )
             raise typer.Exit(1)
     except docker.errors.NotFound:

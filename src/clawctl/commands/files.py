@@ -61,7 +61,7 @@ def files_push(
 
     console.print(
         "\n[dim]Note: If the container was created before file push support was added, "
-        "run `clawctl restart {username}` to pick up the /mnt/files mount.[/dim]"
+        "run `clawctl instance restart {username}` to pick up the /mnt/files mount.[/dim]"
     )
 
 

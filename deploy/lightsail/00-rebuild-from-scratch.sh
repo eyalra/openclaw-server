@@ -71,7 +71,7 @@ cd $REMOTE_REPO_PATH
 
 echo "Step 1: Stopping all containers..."
 if command -v clawctl >/dev/null 2>&1 && [ -f "clawctl.toml" ]; then
-    clawctl stop-all --config clawctl.toml 2>/dev/null || true
+    clawctl instance stop-all --config clawctl.toml 2>/dev/null || true
     echo "  Containers stopped"
 else
     # Fallback: stop containers manually

@@ -102,4 +102,4 @@ def regenerate(
     console.print(f"  Config file: {config_path}")
     console.print()
     console.print("[yellow]Note:[/yellow] Restart the container to apply changes:")
-    console.print(f"  [bold]clawctl restart {name}[/bold]")
+    console.print(f"  [bold]clawctl instance restart {name}[/bold]")

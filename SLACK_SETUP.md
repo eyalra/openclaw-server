@@ -81,7 +81,7 @@ The command will:
 Check the container logs to see if Slack connected:
 
 ```bash
-clawctl logs alice
+clawctl instance logs alice
 ```
 
 You should see messages about Slack connecting. Try mentioning the bot in a Slack channel:
@@ -94,7 +94,7 @@ You should see messages about Slack connecting. Try mentioning the bot in a Slac
 
 ### Bot doesn't respond
 
-1. **Check logs**: `clawctl logs alice`
+1. **Check logs**: `clawctl instance logs alice`
 2. **Verify tokens**: Make sure both tokens are correct
 3. **Check scopes**: Ensure all required scopes are added
 4. **Socket Mode**: Verify Socket Mode is enabled in Slack app settings
@@ -136,5 +136,5 @@ nano data/secrets/alice/slack_app_token
 
 # Regenerate config and restart
 clawctl config regenerate alice
-clawctl restart alice
+clawctl instance restart alice
 ```

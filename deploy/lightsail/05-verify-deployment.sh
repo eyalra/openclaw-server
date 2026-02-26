@@ -77,7 +77,7 @@ echo ""
 echo "Step 5: Container status (using clawctl)..."
 if command -v clawctl >/dev/null 2>&1 && [ -f "clawctl.toml" ]; then
     echo ""
-    clawctl status --config clawctl.toml || echo "  ⚠ Status check failed"
+    clawctl instance status --config clawctl.toml || echo "  ⚠ Status check failed"
 else
     echo "  ⚠ clawctl not available or config not found"
 fi
@@ -109,7 +109,7 @@ echo "  docker logs openclaw-user1"
 echo "  docker logs openclaw-user2"
 echo ""
 echo "To restart containers:"
-echo "  clawctl restart-all --config clawctl.toml"
+echo "  clawctl instance restart-all --config clawctl.toml"
 REMOTE_SCRIPT
 
 echo ""
