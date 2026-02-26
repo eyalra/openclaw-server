@@ -287,8 +287,16 @@ step_users() {
         sudo chmod -R 775 "$REPO_DIR/data/users/$username/openclaw" 2>/dev/null || true
     done
 
-    # Fix secret ownership: provisioning runs as root, but the web service reads as openclaw
+    # Fix secret ownership: directory owned by openclaw (web service reads it),
+    # but files inside per-user dirs must be readable by UID 1000 (container node user).
     sudo chown -R openclaw:openclaw "$SECRETS_DIR" 2>/dev/null || true
+    for username in $USER_NAMES; do
+        if [ -d "$SECRETS_DIR/$username" ]; then
+            sudo chown -R 1000:1000 "$SECRETS_DIR/$username"
+            sudo chmod 755 "$SECRETS_DIR/$username"
+            sudo chmod 644 "$SECRETS_DIR/$username"/* 2>/dev/null || true
+        fi
+    done
 
     # Discord tokens
     for username in $USER_NAMES; do
@@ -331,6 +339,33 @@ PYEOF
     done
 
     log "Users done"
+}
+
+# ---------------------------------------------------------------------------
+# finalize — Move repo from initial location to final openclaw home
+# ---------------------------------------------------------------------------
+step_finalize() {
+    FINAL_REPO_DIR="$HOME_DIR/openclaw"
+
+    if [ "$REPO_DIR" = "$FINAL_REPO_DIR" ]; then
+        log "Repo already at final location ($FINAL_REPO_DIR)"
+        return
+    fi
+
+    log "Moving repo from $REPO_DIR to $FINAL_REPO_DIR..."
+    sudo mkdir -p "$FINAL_REPO_DIR"
+    sudo rsync -a "$REPO_DIR/" "$FINAL_REPO_DIR/"
+    sudo chown -R openclaw:openclaw "$FINAL_REPO_DIR"
+    sudo mkdir -p "$DATA_DIR"
+    sudo chown -R openclaw:openclaw "$DATA_DIR"
+
+    if [ -d "$REPO_DIR/data/secrets" ]; then
+        sudo mkdir -p "$FINAL_REPO_DIR/data/secrets"
+        sudo rsync -a "$REPO_DIR/data/secrets/" "$FINAL_REPO_DIR/data/secrets/"
+        sudo chown -R openclaw:openclaw "$FINAL_REPO_DIR/data"
+    fi
+
+    log "Repo moved to $FINAL_REPO_DIR"
 }
 
 # ---------------------------------------------------------------------------
@@ -442,10 +477,34 @@ EOF
         fi
     done
 
+    # Self-signed TLS cert with the Tailscale IP as SAN so browsers accept HTTPS
+    # by IP. Traffic is already WireGuard-encrypted; this just satisfies the browser.
+    TS_IP=$(tailscale ip -4)
+    CERT_DIR="/etc/nginx/ssl"
+    sudo mkdir -p "$CERT_DIR"
+    if [ ! -f "$CERT_DIR/selfsigned.crt" ] || \
+       ! openssl x509 -in "$CERT_DIR/selfsigned.crt" -noout -ext subjectAltName 2>/dev/null | grep -q "$TS_IP"; then
+        sudo openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+            -keyout "$CERT_DIR/selfsigned.key" \
+            -out "$CERT_DIR/selfsigned.crt" \
+            -subj "/CN=openclaw" \
+            -addext "subjectAltName=IP:$TS_IP" 2>/dev/null
+        log "TLS cert generated for $TS_IP"
+    else
+        log "TLS cert already valid for $TS_IP"
+    fi
+
+    # Stop Tailscale serve so it doesn't hold port 443 on the Tailscale IP
+    sudo tailscale serve reset 2>/dev/null || true
+    sudo ufw allow from 100.64.0.0/10 to any port 443 proto tcp 2>/dev/null || true
+
     sudo tee /etc/nginx/sites-available/openclaw > /dev/null << NGINXEOF
 server {
-    listen 127.0.0.1:80 default_server;
+    listen $TS_IP:443 ssl default_server;
     server_name _;
+
+    ssl_certificate $CERT_DIR/selfsigned.crt;
+    ssl_certificate_key $CERT_DIR/selfsigned.key;
 $NGINX_GATEWAYS
     location / {
         proxy_pass http://127.0.0.1:9000;
@@ -453,7 +512,7 @@ $NGINX_GATEWAYS
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Proto https;
     }
 }
 NGINXEOF
@@ -461,16 +520,11 @@ NGINXEOF
     sudo ln -sf /etc/nginx/sites-available/openclaw /etc/nginx/sites-enabled/openclaw
     sudo rm -f /etc/nginx/sites-enabled/default
     if sudo nginx -t 2>&1; then
-        sudo systemctl reload nginx
-        log "nginx configured and running"
+        sudo systemctl restart nginx
+        log "nginx configured and running (HTTPS on :443)"
     else
         log "ERROR: nginx config invalid"
     fi
-
-    # Tailscale Serve: HTTPS -> nginx (port 80)
-    sudo tailscale serve reset 2>/dev/null || true
-    sudo tailscale serve --bg 80 2>&1 | tail -5
-    log "Tailscale Serve: HTTPS -> nginx:80"
 }
 
 # ---------------------------------------------------------------------------
@@ -487,6 +541,7 @@ case "$STEP" in
         step_deps
         step_docker
         step_users
+        step_finalize
         step_web
         ;;
     *)
@@ -495,9 +550,12 @@ case "$STEP" in
         ;;
 esac
 
-# After all steps, remove the temporary port 22 UFW rule (Lightsail firewall
-# controls external access; port 22 stays open during setup for safety, then
-# clawctl server setup closes it in Lightsail firewall after the reboot)
-sudo ufw delete allow 22/tcp 2>/dev/null || true
+# Remove port 22 from UFW only when already running from the final location
+# (i.e. non-initial re-runs). During initial setup the Python CLI still needs
+# port 22 to send the reboot command after this script exits.
+FINAL_REPO_DIR="$HOME_DIR/openclaw"
+if [ "$REPO_DIR" = "$FINAL_REPO_DIR" ]; then
+    sudo ufw delete allow 22/tcp 2>/dev/null || true
+fi
 
 log "Done: $STEP"

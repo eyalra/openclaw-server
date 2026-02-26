@@ -149,23 +149,25 @@ async def list_instances(
             
             if gateway_token:
                 from urllib.parse import urlencode
-                # Prefer HTTPS via Tailscale Serve + nginx reverse proxy
+                token_param = f"?token={gateway_token}"
+                # Prefer HTTPS via nginx on Tailscale IP (works without MagicDNS)
+                if tailscale_ip:
+                    ws_url = f"wss://{tailscale_ip}{base_path}"
+                    qs = urlencode({"token": gateway_token, "gatewayUrl": ws_url})
+                    management_urls.append(f"https://{tailscale_ip}{base_path}/?{qs}")
+                # Also offer the .ts.net hostname for MagicDNS clients
                 tailscale_hostname = _get_tailscale_hostname()
                 if tailscale_hostname:
                     ws_url = f"wss://{tailscale_hostname}{base_path}"
                     qs = urlencode({"token": gateway_token, "gatewayUrl": ws_url})
                     management_urls.append(f"https://{tailscale_hostname}{base_path}/?{qs}")
-                # Fallback: direct HTTP via Docker port mapping
-                token_param = f"?token={gateway_token}"
-                if tailscale_ip:
-                    management_urls.append(f"http://{tailscale_ip}:{port}{base_path}/{token_param}")
                 management_urls.append(f"http://localhost:{port}{base_path}/{token_param}")
             else:
+                if tailscale_ip:
+                    management_urls.append(f"https://{tailscale_ip}{base_path}/")
                 tailscale_hostname = _get_tailscale_hostname()
                 if tailscale_hostname:
                     management_urls.append(f"https://{tailscale_hostname}{base_path}/")
-                if tailscale_ip:
-                    management_urls.append(f"http://{tailscale_ip}:{port}{base_path}/")
                 management_urls.append(f"http://localhost:{port}{base_path}/")
         
         # Get model pricing if available
@@ -268,20 +270,18 @@ async def get_instance_status(
         # isn't installed in containers, we use Docker port mapping instead.
         tailscale_serve_enabled = _is_tailscale_serve_enabled(username, paths)
         
+        base_path = f"/gateway/{username}"
         if gateway_token:
+            from urllib.parse import urlencode
             token_param = f"?token={gateway_token}"
-            # Gateways require HTTPS or localhost for secure context (device identity)
-            # HTTP over Tailscale IP doesn't satisfy this requirement
-            # Frontend will show SSH port forwarding instructions
             if tailscale_ip:
-                # Still show the URL, but frontend will warn about secure context
-                management_urls.append(f"http://{tailscale_ip}:{port}{token_param}")
-            # Localhost URL (works if accessed via SSH port forwarding)
+                ws_url = f"wss://{tailscale_ip}{base_path}"
+                qs = urlencode({"token": gateway_token, "gatewayUrl": ws_url})
+                management_urls.append(f"https://{tailscale_ip}{base_path}/?{qs}")
             management_urls.append(f"http://localhost:{port}{token_param}")
         else:
-            # No token - just show port-based URLs
             if tailscale_ip:
-                management_urls.append(f"http://{tailscale_ip}:{port}")
+                management_urls.append(f"https://{tailscale_ip}{base_path}/")
             management_urls.append(f"http://localhost:{port}")
 
     user = config.get_user(username)

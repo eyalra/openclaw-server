@@ -135,16 +135,31 @@ def _get_boto3_client(host: HostConfig, service: str):
     return boto3.client(service, region_name=host.aws_region)
 
 
-def _update_toml_field(toml_path: Path, field: str, value: str) -> None:
-    """Update a single field in the given config file."""
+def _update_toml_field(toml_path: Path, field: str, value: str, *, section: str = "host") -> bool:
+    """Update a field in the config file, inserting it under [section] if missing.
+
+    Returns True if the file was written successfully.
+    """
     import re
     text = toml_path.read_text()
     pattern = rf'^({re.escape(field)}\s*=\s*).*$'
     new_text, n = re.subn(pattern, rf'\g<1>"{value}"', text, flags=re.MULTILINE)
     if n == 0:
-        console.print(f"[yellow]Could not update {field} in {toml_path.name} (field not found)[/yellow]")
-        return
+        # Field doesn't exist yet — insert after the [section] header
+        section_pattern = rf'^(\[{re.escape(section)}\]\s*\n)'
+        new_text, n = re.subn(
+            section_pattern,
+            rf'\g<1>{field} = "{value}"\n',
+            text,
+            count=1,
+            flags=re.MULTILINE,
+        )
+        if n == 0:
+            console.print(f"[yellow]Could not update {field} in {toml_path.name} "
+                          f"(neither field nor [{section}] section found)[/yellow]")
+            return False
     toml_path.write_text(new_text)
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -241,6 +256,38 @@ def host_requirements(
         raise typer.Exit(1)
     else:
         console.print(f"\n[green]All {ok_count} requirements met.[/green]")
+
+
+# ---------------------------------------------------------------------------
+# clawctl server url
+# ---------------------------------------------------------------------------
+
+def host_url(
+    config: Annotated[
+        Optional[Path],
+        typer.Option("--config", "-c", help="Path to clawctl.toml"),
+    ] = None,
+) -> None:
+    """Print the web management interface URL and credentials."""
+    cfg, host, _resolved = _get_host(config)
+
+    result = _run_ssh(host, "tailscale ip -4 2>/dev/null", check=False)
+    ts_ip = result.stdout.strip()
+    if result.returncode != 0 or not ts_ip:
+        console.print("[red]Could not get Tailscale IP from server.[/red]")
+        raise typer.Exit(1)
+
+    url = f"https://{ts_ip}"
+    console.print(f"URL:      {url}")
+
+    admin_user = cfg.web.admin_username if cfg.web else "admin"
+    console.print(f"Username: {admin_user}")
+
+    pw_file = _secrets_dir(host) / "web_admin_password"
+    if pw_file.exists():
+        console.print(f"Password: {pw_file.read_text().strip()}")
+    else:
+        console.print(f"Password: [yellow]not found at {pw_file}[/yellow]")
 
 
 # ---------------------------------------------------------------------------
@@ -490,49 +537,13 @@ def host_setup(
         console.print(f"\n[red]Setup failed (exit {proc.returncode}).[/red]")
         raise typer.Exit(proc.returncode)
 
-    # After harden, move repo and reboot so SSH comes up on 2222
+    # After initial setup, reboot so SSH comes up on 2222
+    # (repo move is handled by setup.sh's step_finalize before the web step)
     if initial and remote_step in ("harden", "all"):
-        # Move repo to openclaw's home (still connected as ubuntu@22)
-        console.print("Moving repo to openclaw user's home...")
-        move_cmd = (
-            f"sudo mkdir -p {host.remote_repo_path} && "
-            f"sudo rsync -a /home/{user}/openclaw/ {host.remote_repo_path}/ && "
-            f"sudo chown -R openclaw:openclaw {host.remote_repo_path} && "
-            f"sudo mkdir -p {host.remote_home}/data && "
-            f"sudo chown -R openclaw:openclaw {host.remote_home}/data"
-        )
-        # Try initial (ubuntu@22) first — it's still the active session
-        cmd2 = _ssh_cmd(host, initial=True) + [move_cmd]
-        proc2 = subprocess.run(cmd2, text=True, capture_output=True)
-        if proc2.returncode != 0:
-            # Fallback: try openclaw@2222
-            cmd2 = _ssh_cmd(host, initial=False) + [move_cmd]
-            proc2 = subprocess.run(cmd2, text=True, capture_output=True)
-        if proc2.returncode != 0:
-            console.print(f"[red]Failed to move repo:[/red] {proc2.stderr.strip()}")
-            raise typer.Exit(1)
-        console.print("  [green]Repo moved[/green]")
-
-        # Move secrets
-        move_secrets = (
-            f"if [ -d /home/{user}/openclaw/data/secrets ]; then "
-            f"sudo mkdir -p {host.remote_repo_path}/data/secrets && "
-            f"sudo rsync -a /home/{user}/openclaw/data/secrets/ {host.remote_repo_path}/data/secrets/ && "
-            f"sudo chown -R openclaw:openclaw {host.remote_repo_path}/data; fi"
-        )
-        cmd3 = _ssh_cmd(host, initial=True) + [move_secrets]
-        proc3 = subprocess.run(cmd3, text=True, capture_output=True, check=False)
-        if proc3.returncode != 0:
-            cmd3 = _ssh_cmd(host, initial=False) + [move_secrets]
-            subprocess.run(cmd3, text=True, capture_output=True, check=False)
-        console.print("  [green]Secrets moved[/green]")
-
-        # Reboot so SSH comes up cleanly on 2222
         console.print("Rebooting instance for SSH changes to take effect...")
         reboot_cmd = _ssh_cmd(host, initial=True) + ["sudo reboot"]
         subprocess.run(reboot_cmd, text=True, capture_output=True, check=False)
 
-        # Wait for SSH on port 2222 as openclaw
         console.print("Waiting for SSH on port 2222...")
         import time as _time
         for attempt in range(20):
@@ -544,6 +555,10 @@ def host_setup(
         else:
             console.print("[red]SSH on 2222 did not come up after reboot.[/red]")
             raise typer.Exit(1)
+
+        # Clean up UFW port 22 on the server (left open for the reboot command)
+        _run_ssh(host, "sudo ufw delete allow 22/tcp 2>/dev/null || true", initial=False, check=False)
+        console.print("  [green]UFW port 22 rule removed[/green]")
 
         # Close port 22 in Lightsail firewall — no longer needed after hardening
         try:
@@ -686,8 +701,11 @@ def host_provision(
 
     # Update config with the IP
     if ip_address and ip_address != host.ip:
-        _update_toml_field(resolved_config, "ip", ip_address)
-        console.print(f"\nUpdated host.ip = {ip_address} in {resolved_config.name}")
+        if _update_toml_field(resolved_config, "ip", ip_address):
+            console.print(f"\nUpdated host.ip = {ip_address} in {resolved_config.name}")
+        else:
+            console.print(f"\n[red]Failed to write IP to {resolved_config.name}.[/red]")
+            console.print(f"Manually add [bold]ip = \"{ip_address}\"[/bold] to the [host] section.")
 
     # Clear known_hosts for this IP to avoid SSH host key warnings
     if ip_address:
@@ -769,7 +787,8 @@ def host_destroy(
         console.print("  Static IP not found, skipping.")
 
     # Clear IP in config
-    _update_toml_field(resolved_config, "ip", "")
+    if not _update_toml_field(resolved_config, "ip", ""):
+        console.print("[yellow]Could not clear host.ip in config — edit manually if needed.[/yellow]")
     console.print("\n[green]Teardown complete. Key pair preserved.[/green]")
 
 

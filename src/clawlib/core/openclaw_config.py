@@ -134,6 +134,15 @@ def generate_openclaw_config(
         ts_hostname = _get_tailscale_hostname()
         if ts_hostname:
             allowed_origins.append(f"https://{ts_hostname}")
+        try:
+            ts_ip_result = subprocess.run(
+                ["tailscale", "ip", "-4"], capture_output=True, text=True, timeout=5
+            )
+            ts_ip = ts_ip_result.stdout.strip()
+            if ts_ip:
+                allowed_origins.append(f"https://{ts_ip}")
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
         control_ui_config: dict = {
             "enabled": True,
             "allowInsecureAuth": True,
