@@ -834,3 +834,59 @@ echo "Done"
         raise typer.Exit(proc.returncode)
 
     console.print("\n[green]Teardown complete.[/green]")
+
+
+# ---------------------------------------------------------------------------
+# clawctl server bootstrap
+# ---------------------------------------------------------------------------
+
+def host_bootstrap(
+    config: Annotated[
+        Optional[Path],
+        typer.Option("--config", "-c", help="Path to clawctl.toml"),
+    ] = None,
+) -> None:
+    """Full one-shot setup: provision → deploy → setup → deploy → ready.
+
+    Creates the Lightsail instance, pushes code and secrets, hardens the server,
+    installs everything, and leaves the server ready to connect to.
+    """
+    from rich.rule import Rule
+
+    def banner(step: int, title: str) -> None:
+        console.print()
+        console.print(Rule(f"[bold]Step {step}/5: {title}[/bold]"))
+        console.print()
+
+    # Step 1: Provision
+    banner(1, "Provision instance")
+    host_provision(config=config)
+
+    # Step 2: Initial deploy (ubuntu@22)
+    banner(2, "Initial deploy (ubuntu@22)")
+    host_deploy(initial=True, config=config)
+
+    # Step 3: Initial setup — harden, reboot, SSH moves to 2222
+    banner(3, "Initial setup (harden + reboot)")
+    host_setup(step=None, initial=True, config=config)
+
+    # Step 4: Final deploy (openclaw@2222) — reinstalls clawctl
+    banner(4, "Final deploy (openclaw@2222)")
+    host_deploy(initial=False, config=config)
+
+    # Step 5: Final setup — build Docker, provision users, start web
+    banner(5, "Final setup (Docker + users + web)")
+    host_setup(step=None, initial=False, config=config)
+
+    console.print()
+    console.print(Rule("[bold green]Bootstrap complete[/bold green]"))
+    console.print()
+
+    # Show final status
+    cfg, host, _resolved = _get_host(config)
+    console.print(f"  Server: [bold]{host.ssh_user}@{host.ip}:{host.ssh_port}[/bold]")
+    console.print(f"  Region: {host.aws_region}")
+    console.print()
+    console.print("Next steps:")
+    console.print("  clawctl server status -c <config>    — verify everything is running")
+    console.print("  clawctl server url -c <config>       — get Tailscale URLs")

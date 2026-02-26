@@ -111,7 +111,7 @@ from clawctl.commands.update import update  # noqa: E402
 from clawctl.commands.clean import clean  # noqa: E402
 from clawctl.commands.gog import gog_setup, gog_test  # noqa: E402
 from clawctl.commands.web import web_start, web_set_password  # noqa: E402
-from clawctl.commands.host import host_status, host_setup, host_deploy, host_teardown, host_requirements, host_provision, host_destroy, host_url  # noqa: E402
+from clawctl.commands.host import host_status, host_setup, host_deploy, host_teardown, host_requirements, host_provision, host_destroy, host_url, host_bootstrap  # noqa: E402
 from clawctl.commands.webhelp import webhelp  # noqa: E402
 
 # Top-level commands
@@ -184,3 +184,4 @@ server_app.command(name="requirements")(host_requirements)
 server_app.command(name="provision")(host_provision)
 server_app.command(name="destroy")(host_destroy)
 server_app.command(name="url")(host_url)
+server_app.command(name="bootstrap")(host_bootstrap)
