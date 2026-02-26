@@ -170,22 +170,22 @@ class SharedCollectionsManager:
             return False
 
     def sync_all(self) -> dict[str, bool]:
-        """Sync all configured collections.
+        """Sync all configured drives (collections + access-controlled drives).
 
         Returns:
-            {collection_name: success} mapping
+            {drive_name: success} mapping
         """
         if not self.shared_config:
             logger.warning("Shared collections not configured")
             return {}
 
         results = {}
-        for collection_name in self.shared_config.collections:
+        for drive_name in self.shared_config.all_drive_names:
             try:
-                results[collection_name] = self.sync_collection(collection_name)
+                results[drive_name] = self.sync_collection(drive_name)
             except Exception:
-                logger.exception("Sync failed for collection %s", collection_name)
-                results[collection_name] = False
+                logger.exception("Sync failed for drive %s", drive_name)
+                results[drive_name] = False
 
         return results
 

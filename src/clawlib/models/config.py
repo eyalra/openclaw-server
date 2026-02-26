@@ -127,42 +127,67 @@ class BackupConfig(BaseModel):
     )
 
 
-class SharedCollectionsConfig(BaseModel):
-    """Configuration for shared document collections synced from S3 or local directory.
-    
-    Collections can be deeply nested (e.g., "newsletters/2024/january").
-    - For S3: Each collection syncs from s3://{bucket}/{prefix}{collection_name}/
-    - For local: Each collection syncs from {local_source_base}/{collection_name}/
-    to {data_root}/shared/{collection_name}/.
+def _validate_drive_name(name: str) -> str:
+    """Validate a drive/collection name to prevent directory traversal."""
+    normalized = Path(name).as_posix()
+    if normalized.startswith("/") or normalized.startswith(".."):
+        raise ValueError(f"Invalid drive name: {name} (cannot start with / or ..)")
+    if "//" in normalized:
+        raise ValueError(f"Invalid drive name: {name} (cannot contain //)")
+    return name
+
+
+class SharedDriveConfig(BaseModel):
+    """A shared drive with optional per-user access control.
+
+    If ``users`` is None (the default), all users can access the drive.
+    Otherwise only the listed usernames may access it.
     """
-    source_type: Literal["s3", "local"] = "s3"  # Source type: 's3' or 'local'
-    
+
+    name: str
+    users: list[str] | None = Field(
+        default=None,
+        description="Usernames that may access this drive. None = all users.",
+    )
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        return _validate_drive_name(v)
+
+
+class SharedCollectionsConfig(BaseModel):
+    """Shared drives synced from S3 or a local directory.
+
+    Two ways to declare drives:
+      - ``collections``: simple list of names, accessible to all users.
+      - ``drives``: list of SharedDriveConfig with optional per-user access.
+
+    Both are synced and mounted. Container mount path: /mnt/shared/{drive_name}/.
+    """
+
+    source_type: Literal["s3", "local"] = "s3"
+
     # S3 configuration (required if source_type is "s3")
-    s3_bucket: str | None = None  # S3 bucket name
+    s3_bucket: str | None = None
     s3_prefix: str = ""  # Base prefix in bucket (e.g., "shared-docs/")
-    
+
     # Local configuration (required if source_type is "local")
-    local_source_base: Path | None = None  # Base directory for local source collections
-    
-    collections: list[str] = Field(default_factory=list)  # List of collection names (folders)
+    local_source_base: Path | None = None
+
+    collections: list[str] = Field(default_factory=list)
+    drives: list[SharedDriveConfig] = Field(default_factory=list)
     sync_schedule: str = Field(default="daily", description="Schedule: 'daily', 'hourly', or cron expression")
-    
+
     @field_validator("collections")
     @classmethod
     def validate_collections(cls, v: list[str]) -> list[str]:
-        """Validate collection paths to prevent directory traversal."""
         for collection in v:
-            # Normalize path and check for directory traversal attempts
-            normalized = Path(collection).as_posix()
-            if normalized.startswith("/") or normalized.startswith(".."):
-                raise ValueError(f"Invalid collection path: {collection} (cannot start with / or ..)")
-            if "//" in normalized:
-                raise ValueError(f"Invalid collection path: {collection} (cannot contain //)")
+            _validate_drive_name(collection)
         return v
-    
+
     @model_validator(mode="after")
     def validate_source_config(self) -> "SharedCollectionsConfig":
-        """Validate that source-specific configuration is provided."""
         if self.source_type == "s3":
             if not self.s3_bucket:
                 raise ValueError("s3_bucket is required when source_type is 's3'")
@@ -170,6 +195,25 @@ class SharedCollectionsConfig(BaseModel):
             if not self.local_source_base:
                 raise ValueError("local_source_base is required when source_type is 'local'")
         return self
+
+    @property
+    def all_drive_names(self) -> list[str]:
+        """Union of ``collections`` (all-user) and ``drives`` names, for sync."""
+        names = list(self.collections)
+        for d in self.drives:
+            if d.name not in names:
+                names.append(d.name)
+        return names
+
+    def drives_for_user(self, username: str) -> list[str]:
+        """Return drive names accessible to *username*."""
+        accessible: list[str] = list(self.collections)
+        for d in self.drives:
+            if d.name in accessible:
+                continue
+            if d.users is None or username in d.users:
+                accessible.append(d.name)
+        return accessible
 
 
 class DefaultsConfig(BaseModel):

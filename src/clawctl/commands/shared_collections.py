@@ -76,22 +76,37 @@ def list_collections(
     shared_config = cfg.clawctl.shared_collections
     manager = SharedCollectionsManager(cfg)
 
-    table = Table(title="Shared Collections")
-    table.add_column("Collection", style="cyan")
-    table.add_column("S3 Path", style="dim")
-    table.add_column("Local Path", style="dim")
+    # Build a lookup from drive name → users restriction
+    drive_users: dict[str, list[str] | None] = {}
+    for name in shared_config.collections:
+        drive_users[name] = None  # all users
+    for d in shared_config.drives:
+        drive_users[d.name] = d.users
+
+    table = Table(title="Shared Drives")
+    table.add_column("Drive", style="cyan")
+    table.add_column("Access", style="dim")
+    table.add_column("Source", style="dim")
     table.add_column("Status", justify="right")
 
-    for collection_name in shared_config.collections:
-        s3_path = f"s3://{shared_config.s3_bucket}/{shared_config.s3_prefix.rstrip('/')}/{collection_name}/"
-        local_path = manager.paths.shared_collection_dir(collection_name)
-        exists = local_path.exists() and local_path.is_dir()
-        status = "[green]exists[/green]" if exists else "[dim]not synced[/dim]"
+    for drive_name in shared_config.all_drive_names:
+        if shared_config.source_type == "s3":
+            source = f"s3://{shared_config.s3_bucket}/{shared_config.s3_prefix.rstrip('/')}/{drive_name}/"
+        else:
+            source = str(shared_config.local_source_base / drive_name) if shared_config.local_source_base else "-"
 
-        table.add_row(collection_name, s3_path, str(local_path), status)
+        local_path = manager.paths.shared_collection_dir(drive_name)
+        exists = local_path.exists() and local_path.is_dir()
+        status = "[green]synced[/green]" if exists else "[dim]not synced[/dim]"
+
+        users = drive_users.get(drive_name)
+        access_str = "[green]all users[/green]" if users is None else ", ".join(users)
+
+        table.add_row(drive_name, access_str, source, status)
 
     console.print(table)
-    console.print(f"\n[dim]S3 Bucket:[/dim] {shared_config.s3_bucket}")
+    if shared_config.source_type == "s3":
+        console.print(f"\n[dim]S3 Bucket:[/dim] {shared_config.s3_bucket}")
     console.print(f"[dim]Sync Schedule:[/dim] {shared_config.sync_schedule}")
 
 

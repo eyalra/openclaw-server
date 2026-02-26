@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from starlette.staticfiles import StaticFiles
 
-from clawctl_web.endpoints import instances, logs, maintenance, models, stats, system, users
+from clawctl_web.endpoints import files, instances, logs, maintenance, models, stats, system, users
 
 # Get the static directory path
 _STATIC_DIR = Path(__file__).parent / "static"
@@ -34,6 +34,7 @@ def create_app(config_path: Path | None = None) -> FastAPI:
 
     # Include routers
     app.include_router(instances.router, prefix="/api/instances", tags=["instances"])
+    app.include_router(files.router, prefix="/api/instances", tags=["files"])
     app.include_router(logs.router, prefix="/api/logs", tags=["logs"])
     app.include_router(models.router, prefix="/api/models", tags=["models"])
     app.include_router(stats.router, prefix="/api/stats", tags=["stats"])

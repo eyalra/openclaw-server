@@ -32,6 +32,7 @@ maintenance_app = typer.Typer(help="Run or schedule nightly maintenance (backup 
 maintenance_schedule_app = typer.Typer(help="Start, stop, and check the nightly maintenance daemon.", no_args_is_help=True)
 shared_collections_app = typer.Typer(help="Sync and list shared document collections (S3 or local).", no_args_is_help=True)
 shared_collections_schedule_app = typer.Typer(help="Start, stop, and check the periodic sync daemon.", no_args_is_help=True)
+files_app = typer.Typer(help="Push, list, and manage per-user files exposed at /mnt/files inside containers.", no_args_is_help=True)
 config_app = typer.Typer(help="Validate clawctl.toml and regenerate per-user openclaw.json configs.", no_args_is_help=True)
 gog_app = typer.Typer(help="Set up and test Google Workspace (gog) OAuth integration for users.", no_args_is_help=True)
 web_app = typer.Typer(help="Start the web management UI and manage its admin password.", no_args_is_help=True)
@@ -51,6 +52,7 @@ app.add_typer(maintenance_app, name="maintenance")
 maintenance_app.add_typer(maintenance_schedule_app, name="schedule")
 app.add_typer(shared_collections_app, name="shared-collections")
 shared_collections_app.add_typer(shared_collections_schedule_app, name="schedule")
+app.add_typer(files_app, name="files")
 app.add_typer(config_app, name="config")
 app.add_typer(gog_app, name="gog")
 app.add_typer(web_app, name="web")
@@ -94,6 +96,7 @@ from clawctl.commands.shared_collections import (  # noqa: E402
     sync,
 )
 from clawctl.commands.maintenance import maintenance_run, schedule_start as maintenance_schedule_start, schedule_stop as maintenance_schedule_stop, schedule_status as maintenance_schedule_status  # noqa: E402
+from clawctl.commands.files import files_push, files_list, files_remove, files_remove_all, files_verify  # noqa: E402
 from clawctl.commands.config_cmd import validate, regenerate  # noqa: E402
 from clawctl.commands.update import update  # noqa: E402
 from clawctl.commands.clean import clean  # noqa: E402
@@ -139,6 +142,12 @@ shared_collections_app.command(name="list")(list_collections)
 shared_collections_schedule_app.command(name="start")(sc_schedule_start)
 shared_collections_schedule_app.command(name="stop")(sc_schedule_stop)
 shared_collections_schedule_app.command(name="status")(sc_schedule_status)
+
+files_app.command(name="push")(files_push)
+files_app.command(name="list")(files_list)
+files_app.command(name="remove")(files_remove)
+files_app.command(name="remove-all")(files_remove_all)
+files_app.command(name="verify")(files_verify)
 
 config_app.command(name="validate")(validate)
 config_app.command(name="regenerate")(regenerate)

@@ -179,11 +179,21 @@ class DockerManager:
                 volumes[str(knowledge_path)] = {"bind": "/mnt/knowledge", "mode": "ro"}
             # If not exists, silently skip (knowledge dir is optional)
 
-        # Add shared collections mount if configured and exists
+        # Mount only the shared drives this user is authorized to access
         if self.config.clawctl.shared_collections:
-            shared_root = self.paths.shared_collections_root
-            if shared_root.exists() and shared_root.is_dir():
-                volumes[str(shared_root)] = {"bind": "/mnt/shared", "mode": "ro"}
+            shared_cfg = self.config.clawctl.shared_collections
+            for drive_name in shared_cfg.drives_for_user(user.name):
+                drive_path = self.paths.shared_collection_dir(drive_name)
+                if drive_path.exists() and drive_path.is_dir():
+                    volumes[str(drive_path)] = {
+                        "bind": f"/mnt/shared/{drive_name}",
+                        "mode": "ro",
+                    }
+
+        # Mount per-user pushed files (read-only)
+        files_dir = self.paths.user_files_dir(user.name)
+        if files_dir.exists() and files_dir.is_dir():
+            volumes[str(files_dir)] = {"bind": "/mnt/files", "mode": "ro"}
 
         # Build environment variables from UserSecretsConfig.
         # Each key in secrets config maps a secret filename to an env var:

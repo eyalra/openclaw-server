@@ -100,6 +100,10 @@ class Paths:
         """
         return self.user_dir(username) / "config"
 
+    def user_files_dir(self, username: str) -> Path:
+        """Directory for admin-pushed files, bind-mounted as /mnt/files (ro)."""
+        return self.user_dir(username) / "files"
+
     def user_secrets_dir(self, username: str) -> Path:
         return self.secrets_root / username
 
@@ -111,6 +115,7 @@ class Paths:
         self.user_workspace_dir(username).mkdir(parents=True, exist_ok=True)
         self.user_backup_dir(username).mkdir(parents=True, exist_ok=True)
         self.user_config_dir(username).mkdir(parents=True, exist_ok=True)
+        self.user_files_dir(username).mkdir(parents=True, exist_ok=True)
         self.user_secrets_dir(username).mkdir(parents=True, exist_ok=True)
 
     def ensure_base_dirs(self) -> None:
