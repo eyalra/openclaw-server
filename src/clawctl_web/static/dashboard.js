@@ -424,9 +424,10 @@ function viewLogs(username) {
     apiCall(`/logs/${username}?tail=100`)
         .then(data => {
             if (data.logs && data.logs.length > 0) {
-                container.innerHTML = `<pre class="logs-content">${data.logs.map(log => 
-                    typeof log === 'string' ? log : JSON.stringify(log)
-                ).join('\n')}</pre>`;
+                const lines = data.logs.map(log =>
+                    (typeof log === 'string' ? log : JSON.stringify(log)).trimEnd()
+                ).join('\n');
+                container.innerHTML = `<pre class="logs-content">${lines}</pre>`;
             } else {
                 container.innerHTML = "<p>No logs available.</p>";
             }
@@ -438,33 +439,40 @@ function viewLogs(username) {
 
 // View stats
 async function viewStats(username) {
+    document.getElementById("stats-username").textContent = username;
+    const modal = document.getElementById("stats-modal");
+    const container = document.getElementById("stats-container");
+    modal.style.display = "block";
+    container.innerHTML = "<p>Loading stats...</p>";
+
     try {
         const data = await apiCall(`/stats/${username}`);
-        const statsHtml = `
-            <div class="stats-card">
-                <h3>Resource Usage: ${username}</h3>
-                <div class="stats-grid">
-                    <div class="stat-item">
-                        <strong>CPU Usage:</strong> ${(data.cpu_percent || 0).toFixed(2)}%
-                    </div>
-                    <div class="stat-item">
-                        <strong>Memory:</strong> ${formatBytes(data.memory_usage || 0)} / ${formatBytes(data.memory_limit || 0)}
-                    </div>
-                    <div class="stat-item">
-                        <strong>Memory %:</strong> ${(data.memory_percent || 0).toFixed(2)}%
-                    </div>
-                    <div class="stat-item">
-                        <strong>Network RX:</strong> ${formatBytes(data.network_rx || 0)}
-                    </div>
-                    <div class="stat-item">
-                        <strong>Network TX:</strong> ${formatBytes(data.network_tx || 0)}
-                    </div>
+        container.innerHTML = `
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-label">CPU</span>
+                    <span class="stat-value">${(data.cpu_percent || 0).toFixed(2)}%</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Memory</span>
+                    <span class="stat-value">${formatBytes(data.memory_usage || 0)} / ${formatBytes(data.memory_limit || 0)}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Memory %</span>
+                    <span class="stat-value">${(data.memory_percent || 0).toFixed(2)}%</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Net RX</span>
+                    <span class="stat-value">${formatBytes(data.network_rx || 0)}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Net TX</span>
+                    <span class="stat-value">${formatBytes(data.network_tx || 0)}</span>
                 </div>
             </div>
         `;
-        alert(statsHtml.replace(/<[^>]*>/g, '')); // Simple alert for now
     } catch (error) {
-        alert(`Error loading stats: ${error.message}`);
+        container.innerHTML = `<p class="error">Error loading stats: ${error.message}</p>`;
     }
 }
 
@@ -763,6 +771,11 @@ document.addEventListener("DOMContentLoaded", () => {
     // Logout button
     document.getElementById("logout-btn").addEventListener("click", logout);
     
+    // Stats modal handlers
+    const statsModal = document.getElementById("stats-modal");
+    document.getElementById("close-stats-btn").onclick = () => { statsModal.style.display = "none"; };
+    document.getElementById("close-stats-x").onclick = () => { statsModal.style.display = "none"; };
+
     // Logs modal handlers
     const logsModal = document.getElementById("logs-modal");
     const closeLogsBtn = document.getElementById("close-logs-btn");
@@ -777,6 +790,12 @@ document.addEventListener("DOMContentLoaded", () => {
             logsModal.style.display = "none";
         };
     }
+
+    // Close stats/logs modals when clicking outside
+    window.addEventListener("click", (event) => {
+        if (event.target === statsModal) statsModal.style.display = "none";
+        if (event.target === logsModal) logsModal.style.display = "none";
+    });
 });
 
 // --- Discord pairing ---

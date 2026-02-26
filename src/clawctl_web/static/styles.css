@@ -368,26 +368,58 @@ ul li {
 
 /* Logs */
 .modal-large {
-    max-width: 90%;
-    width: 90%;
+    max-width: 92%;
+    width: 860px;
 }
 
 .logs-container {
-    max-height: 60vh;
+    max-height: 65vh;
     overflow-y: auto;
     background-color: #1e1e1e;
     color: #d4d4d4;
-    padding: 15px;
+    padding: 10px 12px;
     border-radius: 4px;
     margin-bottom: 15px;
     font-family: 'Courier New', monospace;
-    font-size: 12px;
+    font-size: 11px;
+    line-height: 1.4;
 }
 
 .logs-content {
     margin: 0;
     white-space: pre-wrap;
     word-wrap: break-word;
+    line-height: 1.4;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.stat-item {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.stat-label {
+    font-size: 12px;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.stat-value {
+    font-size: 18px;
+    font-weight: 600;
+    color: #2c3e50;
 }
 
 /* Maintenance panel */

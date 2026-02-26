@@ -27,7 +27,7 @@ if __name__ == "__main__":
     
     # Get port from environment or default to 9000
     port = int(os.environ.get("WEB_PORT", "9000"))
-    host = os.environ.get("WEB_HOST", "0.0.0.0")
+    host = os.environ.get("WEB_HOST", "127.0.0.1")
     
     # Enable auto-reload in development (when WEB_RELOAD env var is set)
     # In production, restart the systemd service instead

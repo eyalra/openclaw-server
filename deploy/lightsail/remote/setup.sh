@@ -135,15 +135,16 @@ EOF
         sudo ufw default allow outgoing
         sudo ufw allow 22/tcp
         sudo ufw allow 2222/tcp
-        sudo ufw allow 80/tcp
         sudo ufw allow from 100.64.0.0/10
         echo "y" | sudo ufw enable
         log "UFW configured"
     else
-        # Ensure our ports are open
+        # Ensure correct ports are open and stale rules are cleaned up
         sudo ufw allow 2222/tcp 2>/dev/null || true
-        sudo ufw allow 80/tcp 2>/dev/null || true
         sudo ufw allow from 100.64.0.0/10 2>/dev/null || true
+        sudo ufw delete allow 22/tcp 2>/dev/null || true
+        sudo ufw delete allow 80/tcp 2>/dev/null || true
+        sudo ufw delete allow 9000/tcp 2>/dev/null || true
         log "UFW already active, rules ensured"
     fi
 }
@@ -339,11 +340,18 @@ step_web() {
     log "Setting up web interface..."
     export PATH="$VENV_DIR/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 
-    # Reinstall clawctl (picks up latest)
-    cd "$REPO_DIR"
-    sudo -u openclaw "$VENV_DIR/bin/pip" install -e "." -q 2>&1 | tail -3
+    # Always use the final target path — the repo is moved here after --initial setup.
+    FINAL_REPO_DIR="$HOME_DIR/openclaw"
+    CONFIG_PATH="$FINAL_REPO_DIR/clawctl.toml"
 
-    CONFIG_PATH="$REPO_DIR/clawctl.toml"
+    # Reinstall from the FINAL path so the editable install points there, not to the
+    # temporary /home/ubuntu/openclaw location used during initial deploy.
+    INSTALL_SRC="$FINAL_REPO_DIR"
+    if [ ! -f "$INSTALL_SRC/pyproject.toml" ]; then
+        INSTALL_SRC="$REPO_DIR"  # fall back to current dir if final doesn't exist yet
+    fi
+    cd "$INSTALL_SRC"
+    sudo -u openclaw "$VENV_DIR/bin/pip" install -e "." -q 2>&1 | tail -3
 
     # Web admin password: read plaintext from secrets, generate bcrypt hash
     PW_PLAINTEXT="$REPO_DIR/data/secrets/web_admin/password_plaintext"
@@ -379,7 +387,7 @@ After=network.target docker.service
 Type=simple
 User=openclaw
 Group=openclaw
-WorkingDirectory=$REPO_DIR
+WorkingDirectory=$FINAL_REPO_DIR
 Environment="PATH=$VENV_DIR/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 ExecStart=$VENV_DIR/bin/python -m clawctl_web.server $CONFIG_PATH
 Restart=on-failure
@@ -403,7 +411,7 @@ EOF
         sudo journalctl -u clawctl-web -n 10 --no-pager
     fi
 
-    sudo ufw allow 9000/tcp 2>/dev/null || true
+    sudo ufw delete allow 9000/tcp 2>/dev/null || true
 
     # Reverse proxy (nginx) for gateway containers
     if ! command -v nginx >/dev/null 2>&1; then
@@ -436,8 +444,7 @@ EOF
 
     sudo tee /etc/nginx/sites-available/openclaw > /dev/null << NGINXEOF
 server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
+    listen 127.0.0.1:80 default_server;
     server_name _;
 $NGINX_GATEWAYS
     location / {
@@ -487,5 +494,10 @@ case "$STEP" in
         exit 1
         ;;
 esac
+
+# After all steps, remove the temporary port 22 UFW rule (Lightsail firewall
+# controls external access; port 22 stays open during setup for safety, then
+# clawctl host setup closes it in Lightsail firewall after the reboot)
+sudo ufw delete allow 22/tcp 2>/dev/null || true
 
 log "Done: $STEP"

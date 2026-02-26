@@ -214,7 +214,7 @@ class WebConfig(BaseModel):
     """Web management interface configuration."""
     enabled: bool = True
     port: int = Field(default=9000, ge=1, le=65535)
-    host: str = "0.0.0.0"
+    host: str = "127.0.0.1"
     admin_username: str = "admin"
     model_price_limits: ModelPriceLimits | None = Field(
         default=None,
@@ -234,7 +234,7 @@ class HostConfig(BaseModel):
     remote_home: str = "/home/openclaw"
     initial_ssh_user: str = "ubuntu"
     initial_ssh_port: int = Field(default=22, ge=1, le=65535)
-    secrets_dir: Path = Path("deploy/lightsail/secrets")
+    secrets_dir: Path = Path("~/.config/openclaw/secrets")
 
     # AWS Lightsail provisioning
     aws_region: str = "us-east-2"

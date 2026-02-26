@@ -70,8 +70,8 @@ def _repo_root() -> Path:
 
 
 def _secrets_dir(host: HostConfig) -> Path:
-    """Resolve the secrets directory, relative to repo root if not absolute."""
-    sd = host.secrets_dir
+    """Resolve the secrets directory: expand ~, then absolutify relative paths against repo root."""
+    sd = host.secrets_dir.expanduser()
     if sd.is_absolute():
         return sd
     return _repo_root() / sd
@@ -211,7 +211,27 @@ def host_requirements(
             dt = user_secrets / "discord_token"
             check(f"{user.name}/discord_token", dt.exists(), str(dt))
 
+    # File permission checks — secrets should not be world-readable
+    import stat
+    warn_count = 0
+    if secrets.exists():
+        for sf in secrets.rglob("*"):
+            if sf.is_file():
+                mode = sf.stat().st_mode
+                if mode & stat.S_IROTH:
+                    table.add_row(
+                        f"perms:{sf.relative_to(secrets)}",
+                        "[yellow]WARN[/yellow]",
+                        f"world-readable ({oct(mode & 0o777)}), should be 600",
+                    )
+                    warn_count += 1
+
     console.print(table)
+    if warn_count:
+        console.print(
+            f"\n[yellow]{warn_count} file(s) have loose permissions.[/yellow] "
+            f"Fix with: chmod -R go-rwx {secrets}"
+        )
     if fail_count:
         console.print(f"\n[red]{fail_count} missing requirement(s).[/red] Fix them before deploying.")
         raise typer.Exit(1)
@@ -488,6 +508,17 @@ def host_setup(
             console.print("[red]SSH on 2222 did not come up after reboot.[/red]")
             raise typer.Exit(1)
 
+        # Close port 22 in Lightsail firewall — no longer needed after hardening
+        try:
+            ls = _get_boto3_client(host, "lightsail")
+            ls.close_instance_public_ports(
+                instanceName=host.instance_name,
+                portInfo={"fromPort": 22, "toPort": 22, "protocol": "tcp"},
+            )
+            console.print("  [green]Port 22 closed in Lightsail firewall[/green]")
+        except Exception as e:
+            console.print(f"  [yellow]Could not close port 22 in Lightsail: {e}[/yellow]")
+
     console.print("\n[green]Setup complete.[/green]")
 
 
@@ -596,9 +627,9 @@ def host_provision(
         ls.attach_static_ip(staticIpName=host.static_ip_name, instanceName=host.instance_name)
         console.print(f"  [green]Allocated and attached: {ip_address}[/green]")
 
-    # Firewall
+    # Firewall — open only what we need, close Lightsail defaults (80, 443, 22)
     console.print(f"\nConfiguring firewall...")
-    for port, label in [(22, "SSH (initial)"), (2222, "SSH (hardened)"), (80, "HTTP")]:
+    for port, label in [(22, "SSH (initial)"), (2222, "SSH (hardened)")]:
         try:
             ls.open_instance_public_ports(
                 instanceName=host.instance_name,
@@ -607,6 +638,14 @@ def host_provision(
             console.print(f"  Port {port} open ({label})")
         except Exception as e:
             console.print(f"  [yellow]Port {port}: {e}[/yellow]")
+    for port in (80, 443, 8080, 8443):
+        try:
+            ls.close_instance_public_ports(
+                instanceName=host.instance_name,
+                portInfo={"fromPort": port, "toPort": port, "protocol": "tcp"},
+            )
+        except Exception:
+            pass  # Fine if the port was never open
 
     # Update clawctl.toml with the IP
     if ip_address and ip_address != host.ip:

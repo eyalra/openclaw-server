@@ -204,7 +204,7 @@ class DockerManager:
             user="1000:1000",
             network=_network_name(user.name),
             volumes=volumes,
-            ports={"18789/tcp": user.port or None},  # fixed port if configured, else random
+            ports={"18789/tcp": ("127.0.0.1", user.port) if user.port else None},
             environment=env_vars if env_vars else None,
             restart_policy={"Name": "unless-stopped"},
             healthcheck={

@@ -44,5 +44,6 @@ data/
 clawctl.toml
 *.secrets
 
-# AWS Lightsail deployment configuration (contains sensitive data)
+# AWS Lightsail deployment secrets and configuration
+deploy/lightsail/secrets/
 deploy/lightsail/.lightsail-config

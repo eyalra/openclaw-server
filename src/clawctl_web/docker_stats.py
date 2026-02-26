@@ -17,9 +17,14 @@ def get_container_stats(docker_mgr: DockerManager, username: str) -> dict[str, A
         stats = container.stats(stream=False)
 
         # Calculate CPU percentage
+        # Use online_cpus if available; fall back to percpu_usage length (absent on some Docker versions)
         cpu_delta = stats["cpu_stats"]["cpu_usage"]["total_usage"] - stats["precpu_stats"]["cpu_usage"]["total_usage"]
-        system_delta = stats["cpu_stats"]["system_cpu_usage"] - stats["precpu_stats"]["system_cpu_usage"]
-        num_cpus = len(stats["cpu_stats"]["cpu_usage"]["percpu_usage"] or [1])
+        system_delta = stats["cpu_stats"].get("system_cpu_usage", 0) - stats["precpu_stats"].get("system_cpu_usage", 0)
+        num_cpus = (
+            stats["cpu_stats"].get("online_cpus")
+            or len(stats["cpu_stats"]["cpu_usage"].get("percpu_usage") or [])
+            or 1
+        )
         cpu_percent = (cpu_delta / system_delta) * num_cpus * 100.0 if system_delta > 0 else 0.0
 
         # Memory stats
