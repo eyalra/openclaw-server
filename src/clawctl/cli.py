@@ -112,11 +112,13 @@ from clawctl.commands.clean import clean  # noqa: E402
 from clawctl.commands.gog import gog_setup, gog_test  # noqa: E402
 from clawctl.commands.web import web_start, web_set_password  # noqa: E402
 from clawctl.commands.host import host_status, host_setup, host_deploy, host_teardown, host_requirements, host_provision, host_destroy, host_url  # noqa: E402
+from clawctl.commands.webhelp import webhelp  # noqa: E402
 
 # Top-level commands
 app.command()(init)
 app.command(name="status")(host_status)
 app.command()(clean)
+app.command()(webhelp)
 
 # Instance commands (container lifecycle — runs on the server)
 instance_app.command(name="start")(start)

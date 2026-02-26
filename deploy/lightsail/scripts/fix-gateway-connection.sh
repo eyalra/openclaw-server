@@ -100,7 +100,7 @@ echo "   ssh -L 32768:localhost:32768 -p $SSH_PORT -i $SSH_KEY $SSH_USER@$LIGHTS
 echo "   Then access: http://localhost:32768?token=<token>"
 echo ""
 echo "2. Enable Tailscale Serve (for HTTPS):"
-echo "   See deploy/lightsail/docs/SOP-03-tailscale-setup.md"
+echo "   See docs/sop-03-tailscale-setup.md"
 echo ""
 echo "3. Use localhost URLs from the status output above"
 echo ""
