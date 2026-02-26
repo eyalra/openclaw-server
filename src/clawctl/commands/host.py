@@ -398,16 +398,35 @@ def host_deploy(
                 _run_local(scp_base + [str(item), f"{target}:{remote_dir}/password_plaintext"], check=False)
                 console.print(f"  [green]web_admin_password[/green]")
 
+    # 3. Push shared collections if they exist locally
+    local_shared = repo / "data" / "shared"
+    if local_shared.is_dir() and any(local_shared.iterdir()):
+        console.print("Syncing shared collections...")
+        remote_shared = f"{remote_repo}/data/shared"
+        _run_ssh(host, f"mkdir -p '{remote_shared}'", initial=initial, check=False)
+        rsync_shared = [
+            "rsync", "-az", "--delete",
+            "-e", ssh_flag,
+            f"{local_shared}/",
+            f"{user}@{host.ip}:{remote_shared}/",
+        ]
+        result_shared = _run_local(rsync_shared, check=False)
+        if result_shared.returncode != 0:
+            console.print(f"[yellow]Shared collections rsync warning:[/yellow] {result_shared.stderr.strip()}")
+        else:
+            count = sum(1 for _ in local_shared.rglob("*") if _.is_file())
+            console.print(f"  [green]Shared collections synced ({count} files)[/green]")
+
     if initial:
         console.print("\n[green]Initial deploy complete.[/green]")
         console.print(f"Code deployed to {remote_repo}")
     else:
-        # 3. Reinstall clawctl on server (only when deploying to the final user)
+        # 4. Reinstall clawctl on server (only when deploying to the final user)
         console.print("Reinstalling clawctl on server...")
         install_cmd = (
             "export PATH=$HOME/.local/bin:$HOME/.local/venv/clawctl/bin:$PATH && "
             f"cd {host.remote_repo_path} && "
-            "uv pip install -e . --python $HOME/.local/venv/clawctl/bin/python -q"
+            "$HOME/.local/venv/clawctl/bin/pip install -e . -q"
         )
         result = _run_ssh(host, install_cmd, check=False)
         if result.returncode != 0:

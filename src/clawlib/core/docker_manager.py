@@ -179,6 +179,12 @@ class DockerManager:
                 volumes[str(knowledge_path)] = {"bind": "/mnt/knowledge", "mode": "ro"}
             # If not exists, silently skip (knowledge dir is optional)
 
+        # Add shared collections mount if configured and exists
+        if self.config.clawctl.shared_collections:
+            shared_root = self.paths.shared_collections_root
+            if shared_root.exists() and shared_root.is_dir():
+                volumes[str(shared_root)] = {"bind": "/mnt/shared", "mode": "ro"}
+
         # Build environment variables from UserSecretsConfig.
         # Each key in secrets config maps a secret filename to an env var:
         #   openrouter_api_key = "openrouter_api_key"
