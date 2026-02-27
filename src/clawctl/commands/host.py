@@ -542,12 +542,22 @@ def host_setup(
     if initial and remote_step in ("harden", "all"):
         console.print("Rebooting instance for SSH changes to take effect...")
         reboot_cmd = _ssh_cmd(host, initial=True) + ["sudo reboot"]
-        subprocess.run(reboot_cmd, text=True, capture_output=True, check=False)
+        reboot_result = subprocess.run(reboot_cmd, text=True, capture_output=True, check=False)
 
-        console.print("Waiting for SSH on port 2222...")
+        if reboot_result.returncode != 0:
+            console.print("  [yellow]SSH reboot failed, using AWS API reboot...[/yellow]")
+            try:
+                ls = _get_boto3_client(host, "lightsail")
+                ls.reboot_instance(instanceName=host.instance_name)
+                console.print("  [green]AWS API reboot sent[/green]")
+            except Exception as e:
+                console.print(f"  [red]AWS API reboot also failed: {e}[/red]")
+                raise typer.Exit(1)
+
+        console.print("Waiting for SSH on port 2222 (may take 2-3 min after reboot)...")
         import time as _time
-        for attempt in range(20):
-            _time.sleep(5)
+        for attempt in range(24):
+            _time.sleep(10)
             result = _run_ssh(host, "echo ok", initial=False, check=False)
             if result.returncode == 0:
                 console.print(f"  [green]SSH on 2222 is up (attempt {attempt + 1})[/green]")

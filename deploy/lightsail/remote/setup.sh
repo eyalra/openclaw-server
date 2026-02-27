@@ -35,6 +35,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEPLOY_DIR="$(dirname "$SCRIPT_DIR")"
 REPO_DIR="$(cd "$DEPLOY_DIR/../.." && pwd)"
+ORIGINAL_REPO_DIR="$REPO_DIR"
 HOME_DIR="/home/openclaw"
 DATA_DIR="$HOME_DIR/data"
 VENV_DIR="$HOME_DIR/.local/venv/clawctl"
@@ -478,16 +479,27 @@ EOF
         fi
     done
 
-    # Plain HTTP on the Tailscale IP. Tailscale WireGuard already encrypts
-    # all traffic, so TLS is redundant. Self-signed certs break browser
-    # WebSocket connections, and MagicDNS (needed for ts.net LE certs)
-    # isn't reliably available on all clients.
     TS_IP=$(tailscale ip -4)
+    CERT_DIR="/etc/nginx/ssl"
+    sudo mkdir -p "$CERT_DIR"
 
-    sudo ufw allow from 100.64.0.0/10 to any port 80 proto tcp 2>/dev/null || true
+    # Self-signed cert for HTTPS on the Tailscale IP
+    if [ ! -f "$CERT_DIR/selfsigned.crt" ] || \
+       ! openssl x509 -in "$CERT_DIR/selfsigned.crt" -noout -ext subjectAltName 2>/dev/null | grep -q "$TS_IP"; then
+        sudo openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+            -keyout "$CERT_DIR/selfsigned.key" \
+            -out "$CERT_DIR/selfsigned.crt" \
+            -subj "/CN=openclaw" \
+            -addext "subjectAltName=IP:$TS_IP" 2>/dev/null
+        log "TLS cert generated for $TS_IP"
+    else
+        log "TLS cert already valid for $TS_IP"
+    fi
+
+    sudo ufw allow from 100.64.0.0/10 to any port 443 proto tcp 2>/dev/null || true
 
     # Determine the first user's gateway port for root WebSocket routing.
-    # The Control UI connects WebSocket to ws://host/ (root path), not to the
+    # The Control UI connects WebSocket to wss://host/ (root path), not to the
     # basePath, so we need to route WS upgrades at / to the gateway.
     FIRST_USER_PORT=$(grep -E '^\s*name\s*=' "$CONFIG_PATH" | head -1 | sed 's/.*"\(.*\)".*/\1/' | xargs -I{} awk "/name *= *\"{}\"/{found=1} found && /^port *=/{print \$3; exit}" "$CONFIG_PATH")
     FIRST_USERNAME=$(grep -E '^\s*name\s*=' "$CONFIG_PATH" | head -1 | sed 's/.*"\(.*\)".*/\1/')
@@ -500,15 +512,18 @@ map \$http_upgrade \$connection_upgrade {
 }
 
 server {
-    listen $TS_IP:80 default_server;
+    listen $TS_IP:443 ssl default_server;
     server_name _;
+
+    ssl_certificate $CERT_DIR/selfsigned.crt;
+    ssl_certificate_key $CERT_DIR/selfsigned.key;
 $NGINX_GATEWAYS
     location / {
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto http;
+        proxy_set_header X-Forwarded-Proto https;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection \$connection_upgrade;
         proxy_set_header X-Forwarded-User $FIRST_USERNAME;
@@ -576,9 +591,10 @@ esac
 
 # Remove port 22 from UFW only when already running from the final location
 # (i.e. non-initial re-runs). During initial setup the Python CLI still needs
-# port 22 to send the reboot command after this script exits.
+# port 22 to send the reboot command after this script exits. Use
+# ORIGINAL_REPO_DIR (before step_finalize may have changed it).
 FINAL_REPO_DIR="$HOME_DIR/openclaw"
-if [ "$REPO_DIR" = "$FINAL_REPO_DIR" ]; then
+if [ "$ORIGINAL_REPO_DIR" = "$FINAL_REPO_DIR" ]; then
     sudo ufw delete allow 22/tcp 2>/dev/null || true
 fi
 
