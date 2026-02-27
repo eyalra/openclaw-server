@@ -465,11 +465,12 @@ EOF
         proxy_pass http://127.0.0.1:$USER_PORT;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection \"upgrade\";
+        proxy_set_header Connection \$connection_upgrade;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-User $username;
         proxy_read_timeout 86400;
     }
 "
@@ -477,48 +478,61 @@ EOF
         fi
     done
 
-    # Self-signed TLS cert with the Tailscale IP as SAN so browsers accept HTTPS
-    # by IP. Traffic is already WireGuard-encrypted; this just satisfies the browser.
+    # Plain HTTP on the Tailscale IP. Tailscale WireGuard already encrypts
+    # all traffic, so TLS is redundant. Self-signed certs break browser
+    # WebSocket connections, and MagicDNS (needed for ts.net LE certs)
+    # isn't reliably available on all clients.
     TS_IP=$(tailscale ip -4)
-    CERT_DIR="/etc/nginx/ssl"
-    sudo mkdir -p "$CERT_DIR"
-    if [ ! -f "$CERT_DIR/selfsigned.crt" ] || \
-       ! openssl x509 -in "$CERT_DIR/selfsigned.crt" -noout -ext subjectAltName 2>/dev/null | grep -q "$TS_IP"; then
-        sudo openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
-            -keyout "$CERT_DIR/selfsigned.key" \
-            -out "$CERT_DIR/selfsigned.crt" \
-            -subj "/CN=openclaw" \
-            -addext "subjectAltName=IP:$TS_IP" 2>/dev/null
-        log "TLS cert generated for $TS_IP"
-    else
-        log "TLS cert already valid for $TS_IP"
-    fi
 
-    # Stop Tailscale serve so it doesn't hold port 443 on the Tailscale IP
-    sudo tailscale serve reset 2>/dev/null || true
-    sudo ufw allow from 100.64.0.0/10 to any port 443 proto tcp 2>/dev/null || true
+    sudo ufw allow from 100.64.0.0/10 to any port 80 proto tcp 2>/dev/null || true
+
+    # Determine the first user's gateway port for root WebSocket routing.
+    # The Control UI connects WebSocket to ws://host/ (root path), not to the
+    # basePath, so we need to route WS upgrades at / to the gateway.
+    FIRST_USER_PORT=$(grep -E '^\s*name\s*=' "$CONFIG_PATH" | head -1 | sed 's/.*"\(.*\)".*/\1/' | xargs -I{} awk "/name *= *\"{}\"/{found=1} found && /^port *=/{print \$3; exit}" "$CONFIG_PATH")
+    FIRST_USERNAME=$(grep -E '^\s*name\s*=' "$CONFIG_PATH" | head -1 | sed 's/.*"\(.*\)".*/\1/')
+    WS_BACKEND="${FIRST_USER_PORT:-9000}"
 
     sudo tee /etc/nginx/sites-available/openclaw > /dev/null << NGINXEOF
-server {
-    listen $TS_IP:443 ssl default_server;
-    server_name _;
+map \$http_upgrade \$connection_upgrade {
+    default upgrade;
+    '' '';
+}
 
-    ssl_certificate $CERT_DIR/selfsigned.crt;
-    ssl_certificate_key $CERT_DIR/selfsigned.key;
+server {
+    listen $TS_IP:80 default_server;
+    server_name _;
 $NGINX_GATEWAYS
     location / {
-        proxy_pass http://127.0.0.1:9000;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Proto http;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
+        proxy_set_header X-Forwarded-User $FIRST_USERNAME;
+        proxy_read_timeout 86400;
+
+        # WebSocket upgrades go to the gateway (Control UI connects WS at root)
+        set \$backend http://127.0.0.1:9000;
+        if (\$http_upgrade = "websocket") {
+            set \$backend http://127.0.0.1:$WS_BACKEND;
+        }
+        proxy_pass \$backend;
     }
 }
 NGINXEOF
 
     sudo ln -sf /etc/nginx/sites-available/openclaw /etc/nginx/sites-enabled/openclaw
     sudo rm -f /etc/nginx/sites-enabled/default
+
+    # nginx binds to the Tailscale IP, so it must start after tailscaled
+    sudo mkdir -p /etc/systemd/system/nginx.service.d
+    printf '[Unit]\nAfter=tailscaled.service\nWants=tailscaled.service\n' \
+        | sudo tee /etc/systemd/system/nginx.service.d/after-tailscale.conf > /dev/null
+    sudo systemctl daemon-reload
+
     if sudo nginx -t 2>&1; then
         sudo systemctl restart nginx
         log "nginx configured and running (HTTPS on :443)"
@@ -540,8 +554,18 @@ case "$STEP" in
         step_harden
         step_deps
         step_docker
-        step_users
         step_finalize
+        # After finalize, the repo lives at its final location. Point there
+        # so containers are created with correct bind-mount paths.
+        FINAL="$HOME_DIR/openclaw"
+        if [ -d "$FINAL/pyproject.toml" ] || [ -f "$FINAL/pyproject.toml" ]; then
+            if [ "$REPO_DIR" != "$FINAL" ]; then
+                REPO_DIR="$FINAL"
+                cd "$REPO_DIR"
+                sudo -u openclaw "$VENV_DIR/bin/pip" install -e "." -q
+            fi
+        fi
+        step_users
         step_web
         ;;
     *)

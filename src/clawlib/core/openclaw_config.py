@@ -126,10 +126,17 @@ def generate_openclaw_config(
         ]
 
     if gateway_token:
-        gateway["auth"] = {"mode": "token", "token": gateway_token}
         if use_tailscale_serve:
-            # Enable Tailscale identity authentication (more secure)
-            gateway["auth"]["allowTailscale"] = True
+            gateway["auth"] = {"mode": "token", "token": gateway_token, "allowTailscale": True}
+        else:
+            # Behind nginx reverse proxy: use trusted-proxy auth so the gateway
+            # accepts the X-Forwarded-User header from nginx. This bypasses the
+            # Tailscale device-identity requirement that blocks browser WebSocket
+            # connections when Tailscale Serve isn't used.
+            gateway["auth"] = {
+                "mode": "trusted-proxy",
+                "trustedProxy": {"userHeader": "X-Forwarded-User"},
+            }
         allowed_origins: list[str] = ["*"]
         ts_hostname = _get_tailscale_hostname()
         if ts_hostname:
@@ -141,6 +148,7 @@ def generate_openclaw_config(
             ts_ip = ts_ip_result.stdout.strip()
             if ts_ip:
                 allowed_origins.append(f"https://{ts_ip}")
+                allowed_origins.append(f"http://{ts_ip}")
         except (FileNotFoundError, subprocess.TimeoutExpired):
             pass
         control_ui_config: dict = {

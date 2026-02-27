@@ -862,6 +862,19 @@ def host_bootstrap(
     banner(1, "Provision instance")
     host_provision(config=config)
 
+    # Wait for SSH to be ready on port 22 (fresh instances take a moment)
+    cfg, host, _resolved = _get_host(config)
+    console.print("Waiting for SSH on port 22...")
+    for attempt in range(24):
+        time.sleep(5)
+        result = _run_ssh(host, "echo ok", initial=True, check=False)
+        if result.returncode == 0:
+            console.print(f"  [green]SSH ready (attempt {attempt + 1})[/green]")
+            break
+    else:
+        console.print("[red]SSH on port 22 did not come up within 2 minutes.[/red]")
+        raise typer.Exit(1)
+
     # Step 2: Initial deploy (ubuntu@22)
     banner(2, "Initial deploy (ubuntu@22)")
     host_deploy(initial=True, config=config)
