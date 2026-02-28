@@ -117,8 +117,8 @@ class TestSecretsManager:
         assert "gog_api_key" not in names
         # gemini uses OAuth login — no API key required at provision time
         assert "gemini_api_key" not in names
-        # github uses gh auth login — no secret required at provision time
-        assert "github_token" not in names
+        # github requires a classic PAT stored as gh_token
+        assert "gh_token" in names
         # coding_agent doesn't require an API key
         assert "openrouter_api_key" in names
 

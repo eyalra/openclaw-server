@@ -155,4 +155,49 @@ else
     fi
 fi
 
+# GitHub CLI authentication and git credential helper.
+# GH_TOKEN comes from /run/secrets/gh_token (exported above).
+# `gh auth setup-git` configures git to use gh as a credential helper,
+# so HTTPS clone/push works without tokens in URLs or .git/config.
+if [ -n "$GH_TOKEN" ]; then
+    gh auth setup-git 2>/dev/null || true
+fi
+
+# Git identity from env vars set by docker_manager
+if [ -n "$GIT_USER_NAME" ]; then
+    git config --global user.name "$GIT_USER_NAME"
+fi
+if [ -n "$GIT_USER_EMAIL" ]; then
+    git config --global user.email "$GIT_USER_EMAIL"
+fi
+
+# Auto-clone repositories listed in .git-repos.json (written by docker_manager).
+# Only clones repos that don't already exist; existing repos are left untouched.
+REPOS_MANIFEST="$HOME/.openclaw/.git-repos.json"
+if [ -f "$REPOS_MANIFEST" ] && [ -n "$GH_TOKEN" ]; then
+    WORKSPACE="$HOME/.openclaw/workspace"
+    mkdir -p "$WORKSPACE"
+    node -e "
+        const fs = require('fs');
+        const { execSync } = require('child_process');
+        const repos = JSON.parse(fs.readFileSync('$REPOS_MANIFEST', 'utf8'));
+        for (const repo of repos) {
+            const dest = '$WORKSPACE/' + repo.path;
+            if (fs.existsSync(dest + '/.git')) {
+                console.log('git: ' + repo.path + ' already cloned, skipping');
+                continue;
+            }
+            console.log('git: cloning ' + repo.url + ' -> ' + repo.path);
+            try {
+                execSync(
+                    'git clone --branch ' + repo.branch + ' -- ' + repo.url + ' ' + dest,
+                    { stdio: 'inherit' }
+                );
+            } catch (e) {
+                console.error('git: clone failed for ' + repo.path + ': ' + e.message);
+            }
+        }
+    " 2>&1 || true
+fi
+
 exec openclaw gateway

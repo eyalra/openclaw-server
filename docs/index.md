@@ -18,6 +18,10 @@
 - [SOP 02: Discord Bot Setup](sop-02-discord-bot-setup.md) -- Step-by-step Discord bot creation
 - [SOP 03: Tailscale Setup](sop-03-tailscale-setup.md) -- Tailscale installation and serve configuration
 
+## How-To Guides
+
+- [Managing Server Files](managing-server-files.md) -- Push files, sync shared collections, and update read-only mounts
+
 ## Reference
 
 - [Lightsail Docs Index](lightsail-docs-index.md) -- Overview of Lightsail deployment documentation

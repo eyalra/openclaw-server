@@ -1,58 +1,67 @@
 # GitHub Repository Access Setup
 
-Configure your OpenClaw agent to clone and push to specific GitHub repositories
-using a fine-grained Personal Access Token (PAT).
+Configure your OpenClaw agent to clone and push to GitHub repositories
+using a dedicated bot account and a classic Personal Access Token (PAT).
 
-## Why fine-grained PATs?
+## Overview
 
-GitHub offers two kinds of tokens:
+The agent runs inside a Docker container. On startup the entrypoint:
 
-| | Classic PAT | Fine-grained PAT |
-|---|---|---|
-| Scope | All repos you can access | Only repos you select |
-| Permissions | Coarse (e.g. `repo` = everything) | Granular (e.g. Contents: read+write) |
-| Expiration | Optional | Required (max 1 year) |
-| Audit | Limited | Full audit log |
+1. Reads the PAT from `/run/secrets/gh_token` and exports it as `GH_TOKEN`
+2. Runs `gh auth setup-git` so plain `git clone`/`push` over HTTPS uses the token
+3. Sets `git config --global user.name/email` from `GIT_USER_NAME`/`GIT_USER_EMAIL`
+4. Auto-clones repos listed in `.git-repos.json` into the workspace
 
-Fine-grained PATs follow the principle of least privilege: the token can only
-access the exact repositories and permissions you choose.
+The token never appears in git URLs, `.git/config`, or shell history.
 
-## Step 1: Create a fine-grained PAT
+## Step 1: Create a dedicated GitHub bot account
 
-1. Go to [github.com/settings/tokens?type=beta](https://github.com/settings/tokens?type=beta)
-2. Click **Generate new token**
-3. Fill in:
-   - **Token name**: `openclaw-<username>` (e.g. `openclaw-omar`)
-   - **Expiration**: 90 days is a good balance (set a calendar reminder to rotate)
-   - **Resource owner**: Your personal account or organization
-4. Under **Repository access**, select **Only select repositories** and pick
-   the specific repos the agent needs
-5. Under **Permissions → Repository permissions**, set:
-   - **Contents**: Read and write (needed for clone + push)
-   - Leave everything else at "No access"
-6. Click **Generate token** and copy the value (starts with `github_pat_...`)
+Create a new GitHub account the agent will commit as (e.g. `omar-bot`).
 
-## Step 2: Store the token as a secret
+- Go to [github.com/signup](https://github.com/signup)
+- Use a distinct email (e.g. `omar+bot@atthought.com`)
+- Pick a recognizable username so commits are clearly from the bot
+
+## Step 2: Invite the bot as a collaborator
+
+**Personal repositories:**
+
+1. Go to your repo → **Settings** → **Collaborators** (under "Access")
+2. Click **Add people**, search for the bot account, click **Add**
+   (personal repo collaborators automatically get push access)
+3. Log in as the bot and **accept the invitation**
+
+**Organization repositories:**
+
+1. On each repo: **Settings** → **Collaborators and teams** → **Add people** → choose **Write** role
+2. Or create a Team with Write access and add the bot to it
+
+## Step 3: Create a classic PAT on the bot account
+
+Fine-grained PATs only cover repos the token owner **owns**. Since the bot
+is a collaborator (not owner), use a **classic** PAT instead.
+
+1. Log in as the bot account
+2. Go to [github.com/settings/tokens](https://github.com/settings/tokens)
+3. Click **Generate new token** → **Generate new token (classic)**
+4. Fill in:
+   - **Note**: `openclaw-agent`
+   - **Expiration**: 90 days (set a reminder to rotate)
+5. Under **Select scopes**, check **`repo`**
+6. Click **Generate token** and copy the value (`ghp_...`) immediately
+
+The access boundary comes from the collaborator invitations — the bot can
+only push to repos where you explicitly granted access.
+
+## Step 4: Store the token as a secret
 
 ```bash
-# Create the user's secrets directory if it doesn't exist
 mkdir -p ~/.config/openclaw/secrets/<username>
-
-# Write the token (paste when prompted, then Ctrl-D)
-cat > ~/.config/openclaw/secrets/<username>/github_token
-# <paste token, press Enter, then Ctrl-D>
-
-# Lock down permissions
-chmod 600 ~/.config/openclaw/secrets/<username>/github_token
+echo "<paste-token>" > ~/.config/openclaw/secrets/<username>/gh_token
+chmod 600 ~/.config/openclaw/secrets/<username>/gh_token
 ```
 
-The token file is mounted read-only into the container at `/run/secrets/github_token`
-and used by a credential helper -- it never appears in git URLs, `.git/config`, or
-shell history.
-
-## Step 3: Configure your clawctl.toml
-
-Add the token to the user's secrets and configure the git section:
+## Step 5: Configure clawctl.toml
 
 ```toml
 [[users]]
@@ -61,77 +70,56 @@ port = 18001
 
 [users.secrets]
 openrouter_api_key = "openrouter_api_key"
-github_token = "github_token"
+gh_token = "gh_token"
 
 [users.git]
-user_name = "Omar (bot)"
+user_name = "omarlit32"
 email = "omar@atthought.com"
-token_secret = "github_token"
+token_secret = "gh_token"
 
+# Repos to auto-clone into the workspace on container start
 [[users.git.repos]]
 url = "https://github.com/your-org/project-alpha.git"
 branch = "main"
-path = "projects/project-alpha"
+path = "project-alpha"
 
 [[users.git.repos]]
 url = "https://github.com/your-org/project-beta.git"
 branch = "develop"
-path = "projects/project-beta"
+path = "project-beta"
 ```
 
-- **`token_secret`**: references the filename in the secrets directory
-- **`path`**: relative to the agent's workspace (`/home/node/.openclaw/workspace/`)
-- **`branch`**: the branch to clone and track (default: `main`)
+- **`token_secret`**: filename in the secrets directory (becomes `GH_TOKEN` env var)
+- **`path`**: clone destination relative to `/home/node/.openclaw/workspace/`
+- **`branch`**: branch to check out (default: `main`)
+- Repos that already exist on disk are skipped (not re-cloned)
 
-## Step 4: Verify the token works
-
-Before deploying, test the token locally:
-
-```bash
-# Test read access
-GIT_TOKEN=$(cat ~/.config/openclaw/secrets/<username>/github_token)
-git ls-remote "https://x-access-token:${GIT_TOKEN}@github.com/your-org/project-alpha.git"
-
-# You should see a list of refs (branches/tags). If you get a 401, the token
-# is invalid or doesn't have access to that repo.
-```
-
-## Step 5: Deploy
+## Step 6: Deploy
 
 ```bash
 clawctl server deploy -c personal.toml
 ```
 
-On the next container start, the agent will automatically:
-1. Configure git with the credential helper (reads token from `/run/secrets/`)
-2. Set `user.name` and `user.email` for commits
-3. Clone any repos that don't exist yet
-4. Pull updates for repos that already exist
-
-You can also trigger a manual sync:
-
-```bash
-clawctl git sync <username> -c personal.toml
-```
+On the next container start the agent can `git clone`, `git push`, and
+`gh pr create` against any repo the bot account has access to.
 
 ## Token rotation
 
-Fine-grained PATs expire. When yours is about to expire:
+When your token is about to expire:
 
-1. Generate a new token (same steps as above)
-2. Replace the secret file:
+1. Generate a new classic PAT (same steps as above)
+2. Replace the secret:
    ```bash
-   cat > ~/.config/openclaw/secrets/<username>/github_token
-   # <paste new token, Ctrl-D>
-   chmod 600 ~/.config/openclaw/secrets/<username>/github_token
+   echo "<new-token>" > ~/.config/openclaw/secrets/<username>/gh_token
+   chmod 600 ~/.config/openclaw/secrets/<username>/gh_token
    ```
 3. Redeploy: `clawctl server deploy -c personal.toml`
-4. Restart the user's container so it picks up the new token
+4. Restart the container so it picks up the new token
 
 ## Security checklist
 
-- [ ] Token scoped to **only the repos** the agent needs (not "All repositories")
-- [ ] Only **Contents: Read and write** permission granted
-- [ ] Token has an **expiration date** (90 days recommended)
-- [ ] Secret file has **0600 permissions** (owner read/write only)
-- [ ] Token is **not committed** to any git repo (secrets dir is in `.gitignore`)
+- [ ] Bot account invited as collaborator only on repos the agent needs
+- [ ] Classic PAT has only the `repo` scope
+- [ ] Token has an expiration date (90 days recommended)
+- [ ] Secret file has 0600 permissions (owner read/write only)
+- [ ] Token is not committed to any git repo (secrets dir is in `.gitignore`)

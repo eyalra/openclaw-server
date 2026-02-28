@@ -88,6 +88,7 @@ class SecretsManager:
             "gog_client_id": "Google OAuth Client ID",
             "gog_client_secret": "Google OAuth Client Secret",
             "gog_keyring_password": "Gog keyring encryption password",
+            "gh_token": "GitHub classic PAT (ghp_...) for git push access",
         }
 
         # Collect all explicitly declared secrets from the [users.secrets] block.
@@ -107,7 +108,7 @@ class SecretsManager:
         skills = user_config.skills
         if defaults:
             # Merge defaults with user-specific overrides
-            for skill_name in ["gog", "gemini", "coding_agent"]:
+            for skill_name in ["gog", "gemini", "coding_agent", "github"]:
                 user_val = getattr(skills, skill_name, None)
                 default_val = getattr(defaults.skills, skill_name, False)
                 # A skill value may be a bool or an object with an .enabled attribute
@@ -127,7 +128,7 @@ class SecretsManager:
                             seen.add(secret_name)
         else:
             # No defaults, just use user skills
-            for skill_name in ["gog", "gemini", "coding_agent"]:
+            for skill_name in ["gog", "gemini", "coding_agent", "github"]:
                 val = getattr(skills, skill_name, False)
                 is_enabled = val.enabled if hasattr(val, "enabled") else bool(val)
                 if is_enabled and skill_name in SKILL_REQUIRED_SECRETS:

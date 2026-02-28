@@ -214,6 +214,27 @@ class DockerManager:
                 except OSError:
                     pass
 
+        # Git identity for the coding agent
+        if user.git:
+            if user.git.user_name:
+                env_vars["GIT_USER_NAME"] = user.git.user_name
+            if user.git.email:
+                env_vars["GIT_USER_EMAIL"] = user.git.email
+
+            # Write repos manifest so the entrypoint can auto-clone
+            if user.git.repos:
+                import json
+                manifest = [r.model_dump() for r in user.git.repos]
+                manifest_path = openclaw_dir / ".git-repos.json"
+                manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+                try:
+                    subprocess.run(
+                        ["chown", "1000:1000", str(manifest_path)],
+                        check=False, capture_output=True,
+                    )
+                except (PermissionError, FileNotFoundError):
+                    pass
+
         self.client.containers.create(
             image=self.image_tag,
             name=name,

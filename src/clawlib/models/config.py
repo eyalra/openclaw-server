@@ -65,7 +65,7 @@ SKILL_REQUIRED_SECRETS = {
     "gog": ["gog_client_id", "gog_client_secret", "gog_keyring_password"],
     "gemini": [],  # uses interactive OAuth login via `gemini` binary, no API key needed
     "coding_agent": [],  # coding-agent doesn't require external API keys
-    "github": [],  # uses `gh auth login` interactive flow, no secret needed at provision time
+    "github": ["gh_token"],  # classic PAT for push access; also used by `gh` CLI via GH_TOKEN env var
 }
 
 
@@ -85,6 +85,31 @@ class UserSecretsConfig(BaseModel):
     #   anthropic_api_key = "anthropic_api_key"
 
 
+class GitRepoConfig(BaseModel):
+    """A git repository to clone into the agent's workspace."""
+
+    url: str = Field(description="HTTPS clone URL (e.g. https://github.com/org/repo.git)")
+    branch: str = "main"
+    path: str = Field(description="Clone destination relative to workspace root")
+
+    @field_validator("path")
+    @classmethod
+    def validate_path(cls, v: str) -> str:
+        normalized = Path(v).as_posix()
+        if normalized.startswith("/") or ".." in normalized.split("/"):
+            raise ValueError(f"Invalid repo path: {v} (must be relative, no ..)")
+        return v
+
+
+class UserGitConfig(BaseModel):
+    """Git identity and repository configuration for the coding agent."""
+
+    user_name: str = ""
+    email: str = ""
+    token_secret: str = Field(default="gh_token", description="Secret filename containing the GitHub PAT")
+    repos: list[GitRepoConfig] = Field(default_factory=list)
+
+
 class UserConfig(BaseModel):
     name: str
     port: int | None = Field(default=None, ge=1024, le=65535, description="Fixed host port for the gateway (optional; random if unset)")
@@ -92,6 +117,7 @@ class UserConfig(BaseModel):
     agent: UserAgentConfig = UserAgentConfig()
     skills: SkillsConfig = SkillsConfig()
     secrets: UserSecretsConfig
+    git: UserGitConfig | None = None
     workspace_template: Path | None = None
 
     @field_validator("name")

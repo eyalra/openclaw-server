@@ -47,7 +47,7 @@ model = "openrouter/z-ai/glm-4.5-air:free"
 [clawctl.defaults.skills]
 gemini = true       # auth: run `gemini` once interactively to complete OAuth login
 coding_agent = true
-github = true       # auth: run `gh auth login` inside the container to authenticate
+github = true       # auth: via gh_token secret (classic PAT); auto-configures gh CLI + git credential helper
 
 # gog requires a per-user email — configure it per-user via [users.skills.gog]
 # Secrets prompted on user add: gog_client_id, gog_client_secret, gog_keyring_password
@@ -87,6 +87,18 @@ email = "alice@example.com"
 
 [users.secrets]
 openrouter_api_key = "openrouter_api_key"
+gh_token = "gh_token"
+
+# Git identity and repos for the coding agent (see docs/github-setup.md)
+# [users.git]
+# user_name = "alice-bot"
+# email = "alice+bot@example.com"
+# token_secret = "gh_token"
+#
+# [[users.git.repos]]
+# url = "https://github.com/your-org/your-repo.git"
+# branch = "main"
+# path = "your-repo"
 
 [users.agent]
 model = "openrouter/z-ai/glm-4.5-air:free"

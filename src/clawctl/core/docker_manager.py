@@ -166,6 +166,32 @@ class DockerManager:
                 # Mount entire shared/ directory once, preserving nested structure
                 volumes[str(shared_root)] = {"bind": "/mnt/shared", "mode": "ro"}
 
+        # Git identity for the coding agent
+        env_vars: dict[str, str] = {}
+        if user.git:
+            if user.git.user_name:
+                env_vars["GIT_USER_NAME"] = user.git.user_name
+            if user.git.email:
+                env_vars["GIT_USER_EMAIL"] = user.git.email
+
+            # Write repos manifest so the entrypoint can auto-clone
+            if user.git.repos:
+                import json
+                import subprocess as _sp
+                oc_dir = Path(openclaw_dir)
+                manifest = [r.model_dump() for r in user.git.repos]
+                manifest_path = oc_dir / ".git-repos.json"
+                try:
+                    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+                except PermissionError:
+                    _sp.run(["sudo", "tee", str(manifest_path)],
+                            input=json.dumps(manifest, indent=2) + "\n",
+                            capture_output=True, text=True, check=False)
+                _sp.run(["chown", "1000:1000", str(manifest_path)],
+                        check=False, capture_output=True)
+                _sp.run(["sudo", "chown", "1000:1000", str(manifest_path)],
+                        check=False, capture_output=True)
+
         self.client.containers.create(
             image=self.image_tag,
             name=name,
@@ -173,6 +199,7 @@ class DockerManager:
             network=_network_name(user.name),
             volumes=volumes,
             ports={"18789/tcp": ("127.0.0.1", user.port) if user.port else None},
+            environment=env_vars if env_vars else None,
             restart_policy={"Name": "unless-stopped"},
             healthcheck={
                 "Test": ["CMD-SHELL", "curl -so /dev/null http://127.0.0.1:18789/ || exit 1"],

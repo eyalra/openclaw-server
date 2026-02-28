@@ -173,6 +173,55 @@ def files_verify(
         raise typer.Exit(1)
 
 
+GUIDE_TEXT = """\
+[bold]Managing Server Files[/bold]
+
+Each user container has read-only bind mounts supplied by the host.
+Updating files on the host is immediately visible — no restart needed
+unless a [bold]new mount point[/bold] was added after container creation.
+
+[bold cyan]Per-User Files (/mnt/files)[/bold cyan]
+
+  clawctl files push <user> report.pdf          Push a single file
+  clawctl files push <user> data.csv -d q4.csv  Push to a specific dest path
+  clawctl files push <user> ./docs/             Push a directory
+  clawctl files push <user> run.sh -x           Push as executable
+  clawctl files list <user>                     List pushed files
+  clawctl files verify <user>                   Verify checksums
+  clawctl files remove <user> <path>            Remove a file
+  clawctl files remove-all <user> -y            Remove all files
+
+[bold cyan]Shared Collections (/mnt/shared/)[/bold cyan]
+
+  clawctl shared-collections sync               Sync all collections
+  clawctl shared-collections sync <name>        Sync one collection
+  clawctl shared-collections list               Show configured collections
+
+  Configure in clawctl.toml under [clawctl.shared_collections].
+  Source can be S3 or a local directory. Schedule with:
+
+  clawctl shared-collections schedule start     Start background sync daemon
+  clawctl shared-collections schedule stop      Stop the daemon
+
+[bold cyan]When do containers need a restart?[/bold cyan]
+
+  Updated files in an existing mount     → [green]No[/green]
+  New secret added to config             → [yellow]Yes[/yellow] (deploy + setup)
+  New shared collection in config        → [yellow]Yes[/yellow] (new mount needed)
+  Code/image change                      → [yellow]Yes[/yellow] (setup recreates containers)
+
+  clawctl instance restart <user>        Restart one container
+  clawctl instance restart-all           Restart all containers
+
+[dim]Full documentation: clawctl webhelp → Managing Server Files[/dim]
+"""
+
+
+def files_guide() -> None:
+    """Show a quick-reference guide for managing server files."""
+    console.print(GUIDE_TEXT)
+
+
 def _fmt_size(n: int) -> str:
     for unit in ("B", "KB", "MB", "GB"):
         if n < 1024:
